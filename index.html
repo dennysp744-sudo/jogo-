@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Missão Cinema — Convite</title>
+<style>
+  /* ====== Estilos gerais ====== */
+  :root{
+    --bg:#0b1020; --panel:#0f1724; --accent:#ffd166; --muted:#9aa8bf;
+  }
+  html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; background:linear-gradient(180deg,#071027 0%, #071c2a 100%);color:#e6eef7}
+  .wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:20px}
+  .panel{background:rgba(10,14,24,0.6);border:1px solid rgba(255,255,255,0.04);backdrop-filter:blur(6px);padding:14px;border-radius:12px;width:100%;max-width:960px;box-shadow:0 10px 30px rgba(2,6,23,0.6)}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+  header h1{font-size:18px;margin:0;color:var(--accent)}
+  .controls{display:flex;gap:10px;align-items:center}
+  button.primary{background:var(--accent);border:none;padding:8px 14px;border-radius:10px;font-weight:600;cursor:pointer}
+  button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);padding:6px 10px;border-radius:8px;cursor:pointer}
+  .row{display:flex;gap:10px;align-items:center}
+  /* canvas container */
+  .stage{background:linear-gradient(180deg,#0b2b3a, #06202a);border-radius:8px;padding:12px;display:flex;justify-content:center}
+  canvas{image-rendering:pixelated;border:4px solid rgba(255,255,255,0.03);border-radius:6px;background:#071726}
+  footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px;color:var(--muted);font-size:13px}
+  .hud{display:flex;gap:8px;align-items:center}
+  .big{font-size:20px;font-weight:700;color:#fff}
+  .finalScreen{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(0,0,0,0.55),rgba(0,0,0,0.85));z-index:40}
+  .cardFinal{background:linear-gradient(180deg,#071b2a,#072033);border-radius:12px;padding:22px;border:1px solid rgba(255,255,255,0.06);text-align:center;color:#fff;max-width:600px}
+  .cardFinal h2{margin:0 0 12px 0;font-size:20px}
+  .heart{font-size:34px;margin-top:6px}
+  .crisper{font-family:monospace}
+  /* responsive */
+  @media (max-width:640px){header h1{font-size:16px}.panel{padding:10px}}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel" role="application" aria-label="Missão Cinema - jogo interativo">
+      <header>
+        <h1>Missão Cinema — convide seu namorado</h1>
+        <div class="controls">
+          <button id="startBtn" class="primary">INICIAR MISSÃO</button>
+          <button id="muteBtn" class="ghost">Mudo</button>
+        </div>
+      </header>
+
+      <div class="row" style="justify-content:space-between;align-items:center;">
+        <div class="hud">
+          <div class="big">Fase: <span id="phaseLabel">0</span></div>
+          <div>Tempo: <span id="timeLabel">0.0s</span></div>
+          <div>Itens: <span id="itemsLabel">0</span>/3</div>
+          <div>Pontuação: <span id="scoreLabel">0</span></div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <label for="volume">Volume</label>
+          <input id="volume" type="range" min="0" max="1" step="0.01" value="0.6" />
+        </div>
+      </div>
+
+      <div class="stage" style="margin-top:12px;">
+        <canvas id="game" width="640" height="360"></canvas>
+      </div>
+
+      <footer>
+        <div>Controles: ← → ou swipe | ↑ ou toque para pular</div>
+        <div class="crisper">Com amor, Denise</div>
+      </footer>
+    </div>
+  </div>
+
+  <div id="final" class="finalScreen" role="dialog" aria-modal="true">
+    <div class="cardFinal">
+      <h2 id="finalTitle">Parabéns!</h2>
+      <p id="finalText">Você completou a missão.</p>
+      <div class="heart">Com amor, Denise 💛</div>
+      <div style="margin-top:16px;display:flex;gap:10px;justify-content:center;">
+        <button id="replayBtn" class="primary">Jogar novamente</button>
+        <button id="closeBtn" class="ghost">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/*
+  Jogo em 3 fases: 1) corrida de obstáculos com coleta de milho, manteiga e sal
+                     2) corredor de portas (encontre a porta correta)
+                     3) caça ao ingresso com tempo
+  Comentários e texto em Português formal. Arquivo autossuficiente (sem assets externos): sprites simples desenhados em canvas.
+*/
+
+(() => {
+  // Canvas & escala "pixel art"
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  // Desabilita suavização para visual retrô
+  ctx.imageSmoothingEnabled = false;
+
+  const W = canvas.width, H = canvas.height;
+
+  // Audio (WebAudio) - tomes e efeitos simples (sem arquivos externos)
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = new AudioCtx();
+  let masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.6;
+  masterGain.connect(audioCtx.destination);
+  let muted = false;
+
+  // parâmetros do jogo
+  let game = {
+    running:false, phase:0, time:0, score:0, items:0,
+    entities:[], particles:[], obstacles:[], itemsArr:[], powerups:[], phaseTimer:0,
+    player:null, lastTimestamp:0
+  };
+
+  // volume slider
+  const volumeEl = document.getElementById('volume');
+  volumeEl.addEventListener('input', ()=>{masterGain.gain.value = parseFloat(volumeEl.value)});
+
+  function beep(freq=440, duration=0.08, type='sine', gain=0.12){
+    if(muted) return;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.value = gain;
+    o.connect(g); g.connect(masterGain);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+    o.stop(audioCtx.currentTime + duration + 0.02);
+  }
+
+  function sfxCollect(){beep(880,0.06,'square',0.08)}
+  function sfxJump(){beep(520,0.08,'sine',0.08)}
+  function sfxHit(){beep(150,0.12,'sawtooth',0.14)}
+  function sfxWin(){beep(1100,0.14,'sine',0.14); setTimeout(()=>beep(1400,0.14,'sine',0.12),120)}
+  function sfxError(){beep(220,0.08,'sawtooth',0.12)}
+
+  // util
+  function rand(a,b){return Math.random()*(b-a)+a}
+  function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+
+  // Partículas simples
+  function spawnParticles(x,y,color,count=10){
+    for(let i=0;i<count;i++){
+      game.particles.push({x,y,vx:rand(-1.6,1.6),vy:rand(-3,-0.4),life:rand(30,70),col:color,size:Math.random()*2+1});
+    }
+  }
+
+  // Player (pixel-ish)
+  function createPlayer(){
+    return {x:80,y:H-56,w:18,h:26,vy:0,onGround:true,frame:0,dir:1,runSpeed:1.6,animT:0,shield:0,fast:0};
+  }
+  game.player = createPlayer();
+
+  // game management
+  const phaseLabel = document.getElementById('phaseLabel');
+  const timeLabel = document.getElementById('timeLabel');
+  const itemsLabel = document.getElementById('itemsLabel');
+  const scoreLabel = document.getElementById('scoreLabel');
+
+  function resetPhase1(){
+    game.entities = [];
+    game.obstacles = [];
+    game.itemsArr = [];
+    game.particles = [];
+    game.player.x = 80; game.player.y = H-56; game.player.vy=0; game.player.shield=0; game.player.fast=0; game.items=0; game.phaseTimer=0;
+    // spawn items (milho, manteiga, sal) at different x positions across the level
+    const itemNames = ['milho','manteiga','sal'];
+    for(let i=0;i<3;i++){
+      game.itemsArr.push({type:itemNames[i],x:380 + i*160,y:H-86,col: i===0? '#ffd24a' : i===1? '#fff7b5' : '#e3e3e3',col2:'#a76b00',col3:'#cfcfcf',col4:'#f4d7b0',collected:false});
+    }
+  }
+
+  function resetPhase2(){
+    game.obstacles = [];
+    game.particles = [];
+    game.phaseTimer = 0;
+    // doors positions along corridor
+    game.doors = [];
+    const total = 5;
+    const correct = Math.floor(rand(0,total));
+    game.correctDoorIndex = correct;
+    for(let i=0;i<total;i++){
+      game.doors.push({x:140 + i*90,y:H-110,w:48,h:72,index:i});
+    }
+    game.player.x = 80; game.player.y = H-56; game.player.vy=0;
+  }
+
+  function resetPhase3(){
+    game.obstacles = [];
+    game.particles = [];
+    game.phaseTimer = 0;
+    game.ticket = null;
+    spawnTicket();
+    game.player.x = 80; game.player.y = H-56; game.player.vy=0;
+  }
+
+  function spawnTicket(){
+    // aparece aleatoriamente, se move lentamente
+    game.ticket = {x:rand(180,W-40), y:rand(80,H-140), vx:rand(-0.6,0.6), vy:rand(-0.2,0.2), life: rand(180,360), w:22, h:12};
+  }
+
+  // input handling
+  const keys = {};
+  window.addEventListener('keydown', e=>{keys[e.key]=true;if(!game.running && e.key===' '){startGame()}});
+  window.addEventListener('keyup', e=>{keys[e.key]=false});
+
+  // mobile swipe controls
+  let touchStartX=null, touchStartY=null, touchStartT=null;
+  canvas.addEventListener('touchstart', e=>{
+    const t = e.touches[0]; touchStartX = t.clientX; touchStartY = t.clientY; touchStartT = Date.now();
+    // jump on touch (tap)
+    if(game.running) { playerJump(); }
+  },{passive:true});
+  canvas.addEventListener('touchmove', e=>{}, {passive:true});
+  canvas.addEventListener('touchend', e=>{
+    if(!touchStartX) return; const dt = Date.now()-touchStartT; const t = (e.changedTouches && e.changedTouches[0]); if(!t) return;
+    const dx = t.clientX - touchStartX; const dy = t.clientY - touchStartY;
+    if(Math.abs(dx) > 30 && Math.abs(dx) > Math.abs(dy)){
+      // swipe horizontal
+      if(dx>0) keys['ArrowRight']=true, setTimeout(()=>keys['ArrowRight']=false,80); else keys['ArrowLeft']=true, setTimeout(()=>keys['ArrowLeft']=false,80);
+    }
+    touchStartX=null;
+  }, {passive:true});
+
+  function playerJump(){
+    if(game.player.onGround){game.player.vy = -7.8; game.player.onGround=false; sfxJump();}
+  }
+
+  // collisions AABB
+  function coll(a,b){return !(a.x+a.w < b.x || a.x > b.x+b.w || a.y+a.h < b.y || a.y > b.y+b.h)}
+
+  // spawn obstacles regular interval
+  function maybeSpawnObstacle(dt, intensity=1){
+    game.phaseTimer += dt;
+    if(game.phaseTimer > 650 - intensity*120){
+      game.phaseTimer = 0;
+      // obstacle
+      game.obstacles.push({x:W+20, y:H-50, w:20, h:24, vx: - (1.1 + Math.random()*1.4 + intensity*0.6), type:'rock'});
+    }
+  }
+
+  // update loop
+  function update(dt){
+    if(!game.running) return;
+    game.time += dt/1000;
+    timeLabel.textContent = game.time.toFixed(1) + 's';
+
+    // player controls
+    let dir = 0;
+    if(keys['ArrowLeft'] || keys['a']) dir -= 1;
+    if(keys['ArrowRight'] || keys['d']) dir += 1;
+    if(keys['ArrowUp'] || keys['w'] || keys[' ']){playerJump(); keys[' ']=false}
+
+    // movement forced or manual: implement automatic small forward push in phase1
+    if(game.phase === 1){ // corrida
+      // allow player to move horizontally too
+      game.player.x += (dir + 0.4) * game.player.runSpeed * (game.player.fast?1.8:1);
+    } else {
+      game.player.x += dir * game.player.runSpeed * (game.player.fast?1.6:1);
+    }
+    // gravity
+    game.player.vy += 0.36; game.player.y += game.player.vy;
+    if(game.player.y + game.player.h >= H-20){ game.player.y = H-20 - game.player.h; game.player.vy = 0; game.player.onGround = true; }
+
+    // keep in bounds
+    game.player.x = clamp(game.player.x, 8, W - game.player.w - 8);
+
+    // animate player
+    game.player.animT += dt;
+    if(game.player.animT > 80){ game.player.animT = 0; game.player.frame = (game.player.frame+1)%4; }
+
+    // obstacles movement & collisions
+    for(let i = game.obstacles.length-1; i>=0;i--){
+      let o = game.obstacles[i]; o.x += o.vx;
+      if(o.x + o.w < -40) game.obstacles.splice(i,1);
+      else if(coll(o, game.player)){
+        if(game.player.shield > 0){ // shield consumes
+          game.player.shield = 0; spawnParticles(game.player.x+10, game.player.y+10, '#fff6'); sfxCollect();
+        } else {
+          // hit: penalty
+          sfxHit();
+          game.score = Math.max(0, game.score - 30);
+          spawnParticles(game.player.x+10, game.player.y+10, '#ff3333', 18);
+          // in phase1 reduce progress slightly
+          if(game.phase===1){ game.player.x = 80; }
+          else if(game.phase===2){ // restart corridor
+            flash('erro'); resetPhase2();
+          } else if(game.phase===3){ // restart ticket
+            resetPhase3();
+          }
+        }
+      }
+    }
+
+    // items collection - phase1
+    if(game.phase===1){
+      // spawn obstacles over time
+      maybeSpawnObstacle(dt, 1 + game.time*0.002);
+
+      for(let i=game.itemsArr.length-1;i>=0;i--){
+        let it = game.itemsArr[i];
+        // require that player passed obstacles => simple rule: x must be greater than item's x minus 60
+        if(!it.collected && game.player.x > it.x - 60 && coll({x:it.x-10,y:it.y-6,w:24,h:24}, game.player)){
+          it.collected = true; game.items++; game.score += 120; sfxCollect(); spawnParticles(it.x+8, it.y+4, '#ffd');
+        }
+      }
+      itemsLabel.textContent = game.items + '/3';
+      if(game.items >= 3){ // finish phase
+        setTimeout(()=>{nextPhase();},400);
+      }
+    }
+
+    // corridor - phase2
+    if(game.phase===2){
+      // simple corridor with doors, move camera slightly based on player.x
+      // obstacles may appear
+      maybeSpawnObstacle(dt, 0.4);
+      // check doors
+      for(const d of game.doors){
+        if(coll({x:d.x,y:d.y,w:d.w,h:d.h}, game.player)){
+          // door hit
+          if(d.index === game.correctDoorIndex){
+            sfxCollect(); flash('sucesso'); setTimeout(()=>nextPhase(),300);
+          } else {
+            sfxError(); flash('erro'); resetPhase2();
+          }
+        }
+      }
+    }
+
+    // phase3 ticket
+    if(game.phase===3){
+      maybeSpawnObstacle(dt, 0.6);
+      if(game.ticket){
+        game.ticket.x += game.ticket.vx; game.ticket.y += game.ticket.vy; game.ticket.life -= 1;
+        if(game.ticket.x < 80 || game.ticket.x > W-40) game.ticket.vx *= -1;
+        if(game.ticket.y < 60 || game.ticket.y > H-120) game.ticket.vy *= -1;
+        if(game.ticket.life <= 0){ // respawn - ticket desapareceu -> player lose chance
+          sfxError(); spawnTicket(); game.score = Math.max(0, game.score - 40);
+        }
+        if(coll(game.ticket, game.player)){
+          // collect ticket
+          sfxWin(); spawnParticles(game.ticket.x+8, game.ticket.y+6, '#ffea', 40); game.score += 400; showFinal();
+        }
+      }
+    }
+
+    // update particles
+    for(let i=game.particles.length-1;i>=0;i--){
+      const p = game.particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life--; if(p.life<=0) game.particles.splice(i,1);
+    }
+
+    // obstacles spawn additional small ones sometimes
+  }
+
+  // drawing
+  function draw(){
+    // clear
+    ctx.clearRect(0,0,W,H);
+    // background parallax layers
+    // sky
+    ctx.fillStyle = '#071726'; ctx.fillRect(0,0,W,H);
+
+    // ground
+    ctx.fillStyle = '#0b2b36'; ctx.fillRect(0,H-40,W,40);
+
+    // phase-specific render
+    if(game.phase===0){
+      ctx.fillStyle = '#fff'; ctx.font='16px monospace'; ctx.fillText('Pressione INICIAR MISSÃO para começar', 60, H/2-10);
+    }
+
+    // obstacles
+    for(const o of game.obstacles){
+      ctx.fillStyle = '#6b6b6b'; ctx.fillRect(o.x,o.y,o.w,o.h);
+      // small shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(o.x+2,o.y+o.h-2,o.w,2);
+    }
+
+    // items
+    if(game.phase===1){
+      for(const it of game.itemsArr){
+        if(it.collected) continue;
+        // draw pixel-y bag of item
+        ctx.fillStyle = it.col; ctx.fillRect(it.x, it.y, 18, 12);
+        ctx.fillStyle = it.col2 || '#a76b00'; ctx.fillRect(it.x+2, it.y+2, 14, 4);
+        // label tiny
+        ctx.fillStyle = '#00000088'; ctx.fillRect(it.x, it.y+12, 18, 2);
+      }
+    }
+
+    // doors phase2
+    if(game.phase===2){
+      for(const d of game.doors){
+        // glow on correct door
+        if(d.index === game.correctDoorIndex){
+          ctx.fillStyle = 'rgba(255,209,102,0.18)'; ctx.fillRect(d.x-6,d.y-6,d.w+12,d.h+12);
+        }
+        ctx.fillStyle = '#3a3f4a'; ctx.fillRect(d.x,d.y,d.w,d.h);
+        // handle
+        ctx.fillStyle = '#caa15e'; ctx.fillRect(d.x+d.w-12, d.y+d.h/2 -6, 6, 6);
+      }
+    }
+
+    // ticket
+    if(game.phase===3 && game.ticket){
+      ctx.fillStyle = '#ffd8a6'; ctx.fillRect(game.ticket.x, game.ticket.y, game.ticket.w, game.ticket.h);
+      ctx.fillStyle = '#c47d00'; ctx.fillRect(game.ticket.x+6, game.ticket.y+2, game.ticket.w-12, 4);
+    }
+
+    // player (pixel art)
+    drawPlayer(game.player.x, game.player.y, game.player.frame, game.player.onGround);
+
+    // particles
+    for(const p of game.particles){
+      ctx.fillStyle = p.col; ctx.fillRect(p.x, p.y, p.size, p.size);
+    }
+
+    // HUD - score etc are DOM elements
+  }
+
+  function drawPlayer(x,y,frame,onGround){
+    // simple 3-frame running pixel sprite
+    ctx.save();
+    ctx.translate(x,y);
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(2+4, 24+4, 18, 4);
+    // body
+    ctx.fillStyle = '#6fe3ff'; ctx.fillRect(0,0,18,10); // torso
+    // head
+    ctx.fillStyle = '#ffd7b3'; ctx.fillRect(2,-10,12,10);
+    // legs animation
+    const lf = frame%4;
+    if(lf===0){ ctx.fillStyle='#0b3b4a'; ctx.fillRect(2,10,5,12); ctx.fillRect(11,10,5,12);} 
+    if(lf===1){ ctx.fillStyle='#0b3b4a'; ctx.fillRect(2,12,5,10); ctx.fillRect(11,8,5,14);} 
+    if(lf===2){ ctx.fillStyle='#0b3b4a'; ctx.fillRect(2,10,5,12); ctx.fillRect(11,10,5,12);} 
+    if(lf===3){ ctx.fillStyle='#0b3b4a'; ctx.fillRect(2,8,5,14); ctx.fillRect(11,12,5,10);} 
+    // small particle when jumping
+    if(!onGround){ ctx.fillStyle='#fff'; ctx.fillRect(0,-14,3,3);} 
+    ctx.restore();
+  }
+
+  // flash overlay between phases or on errors
+  let flashState = {t:0,type:null};
+  function flash(type='ok',dur=180){ flashState.t = dur; flashState.type = type; }
+
+  function drawFlash(){ if(flashState.t>0){ flashState.t -= 16; ctx.fillStyle = flashState.type==='erro'? 'rgba(160,20,20,0.22)' : 'rgba(255,220,140,0.12)'; ctx.fillRect(0,0,W,H);} }
+
+  // main loop
+  function loop(ts){
+    if(!game.lastTimestamp) game.lastTimestamp = ts; const dt = ts - game.lastTimestamp; game.lastTimestamp = ts;
+    update(dt); draw(); drawFlash();
+    requestAnimationFrame(loop);
+  }
+
+  requestAnimationFrame(loop);
+
+  // phase progression
+  function startGame(){
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    game.running = true; game.phase = 1; game.time = 0; game.score = 0; game.items = 0; phaseLabel.textContent = game.phase; resetPhase1(); flash('sucesso',220);
+    document.getElementById('startBtn').textContent = 'PAUSAR';
+  }
+
+  function pauseGame(){ game.running = !game.running; document.getElementById('startBtn').textContent = game.running ? 'PAUSAR' : 'CONTINUAR'; }
+
+  function nextPhase(){
+    if(game.phase === 1){ game.phase = 2; phaseLabel.textContent = 2; resetPhase2(); flash('sucesso',160); }
+    else if(game.phase === 2){ game.phase = 3; phaseLabel.textContent = 3; resetPhase3(); flash('sucesso',160); }
+    else if(game.phase === 3){ showFinal(); }
+  }
+
+  // final screen
+  const finalEl = document.getElementById('final');
+  const finalTitle = document.getElementById('finalTitle');
+  const finalText = document.getElementById('finalText');
+  function showFinal(){
+    game.running = false; finalTitle.textContent = 'Convite enviado!';
+    finalText.textContent = `Você encontrou o ingresso em ${game.time.toFixed(1)}s. Pontuação: ${game.score}`;
+    finalEl.style.display = 'flex'; sfxWin();
+  }
+
+  // UI bindings
+  document.getElementById('startBtn').addEventListener('click', ()=>{
+    if(!game.running) startGame(); else pauseGame();
+  });
+  document.getElementById('replayBtn').addEventListener('click', ()=>{ finalEl.style.display='none'; game.phase=1; game.time=0; game.score=0; resetPhase1(); game.running=true; document.getElementById('startBtn').textContent = 'PAUSAR'; });
+  document.getElementById('closeBtn').addEventListener('click', ()=>{ finalEl.style.display='none'; });
+
+  document.getElementById('muteBtn').addEventListener('click', ()=>{ muted = !muted; document.getElementById('muteBtn').textContent = muted ? 'Som desligado' : 'Mudo'; });
+
+  // keyboard touch for jump mapping
+  window.addEventListener('keydown', e=>{ if(e.key === 'ArrowUp') playerJump(); });
+
+  // click on ticket -> collect (phase3)
+  canvas.addEventListener('click', (e)=>{
+    if(game.phase===3 && game.ticket){
+      // map click to canvas coordinates
+      const r = canvas.getBoundingClientRect(); const cx = (e.clientX - r.left) * (canvas.width / r.width); const cy = (e.clientY - r.top) * (canvas.height / r.height);
+      if(cx > game.ticket.x && cx < game.ticket.x + game.ticket.w && cy > game.ticket.y && cy < game.ticket.y + game.ticket.h){
+        // collect
+        sfxWin(); spawnParticles(game.ticket.x+8, game.ticket.y+6, '#fff0', 40); game.score += 400; showFinal();
+      }
+    }
+  });
+
+  // periodic DOM score update
+  setInterval(()=>{ scoreLabel.textContent = String(game.score); itemsLabel.textContent = `${game.items}/3`; }, 120);
+
+  // initial instructions
+  phaseLabel.textContent = '—';
+
+})();
+</script>
+</body>
+</html>
