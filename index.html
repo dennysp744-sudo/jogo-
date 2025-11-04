@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title> Desbloqueie a Surpresa</title>
+<title>SURPRESA!!</title>
 <style>
   :root{--bg:#071726;--panel:#0f1724;--accent:#ffd166;--muted:#9aa8bf}
   html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system,'Segoe UI',Roboto,Arial;background:linear-gradient(180deg,#071027 0%, #071c2a 100%);color:#e6eef7}
@@ -28,6 +28,7 @@
   .cardFinal{background:linear-gradient(180deg,#071b2a,#072033);border-radius:12px;padding:22px;border:1px solid rgba(255,255,255,0.06);text-align:center;color:#fff;max-width:560px}
   .cardFinal h2{margin:0 0 8px 0}
   .small-muted{color:var(--muted);font-size:13px}
+  .door-glow{box-shadow:0 0 14px rgba(255,209,102,0.18);}
   @media (max-width:520px){ .touch-controls .btn{width:48px;height:48px} .jump-btn{width:64px;height:64px} }
 </style>
 </head>
@@ -35,7 +36,7 @@
   <div class="wrap">
     <div class="panel" role="application" aria-label="Missão Cinema - Desbloqueie a Surpresa">
       <header>
-        <h1>Missão Cinema — Desbloqueie a Surpresa</h1>
+        <h1> Desbloqueie a Surpresa</h1>
         <div class="controls">
           <button id="startBtn" class="primary">INICIAR MISSÃO</button>
           <button id="muteBtn" class="ghost">Som</button>
@@ -60,8 +61,8 @@
       </div>
 
       <footer>
-        <div class="small-muted">Controles: ← → ou toque nas setas | ↑ ou botão pular</div>
-        <div class="small-muted">Com amor, Denise</div>
+        <div class="small-muted">Controles: ← → ou toque nas setas | ↑ ou botão pular | Toque no ingresso para coletar</div>
+        <div class="small-muted">Com amor, Denise❤️ </div>
       </footer>
     </div>
   </div>
@@ -87,13 +88,11 @@
 
 <script>
 /*
-  Versão Denise 2.0 - balanceada e otimizada para mobile.
-  - Fase 1: coletar 20 milhos (2 pacotes) em até 120s
-  - Fase 2: corredor de portas 120s
-  - Fase 3: caça ao ingresso 120s
-  - Player permanece visível (câmera fixa), obstáculos e itens movem para a esquerda
-  - Partículas de corações ao coletar milho
-  - Trilha de fundo gerada com WebAudio + efeitos sonoros
+  Versão Denise — fases adicionais integradas:
+  - Fase 1: coletar 20 milhos (120s)  (mantido)
+  - Fase 2: corredor das portas (120s) — enfeite discreto, porta correta brilha, música muda p/ mistério, ao entrar flash branco + "Pronto para a próxima surpresa?"
+  - Fase 3: caça ao ingresso (120s) — ingresso reaparece a cada 15s em pontos aleatórios, vida curta, clique/toque coleta, fogos + corações na coleta
+  - tudo em um único arquivo, trilha via WebAudio (osciladores), SFX internos
 */
 
 (function(){
@@ -103,7 +102,6 @@
   function resizeCanvas(){
     const ratio = window.devicePixelRatio || 1;
     const w = Math.min(window.innerWidth - 32, 920);
-    // manter proporção original
     canvas.style.width = w + 'px';
     canvas.style.height = Math.round(w * (420/800)) + 'px';
     canvas.width = Math.round(w * ratio);
@@ -118,35 +116,47 @@
   let masterGain = audioCtx.createGain(); masterGain.gain.value = 0.6; masterGain.connect(audioCtx.destination);
   let muted = false;
 
-  // background music simple loop
-  let musicNode = null; let musicOn = true;
+  // music nodes + state
+  let musicNode = null;
+  let musicMode = 'calm'; // 'calm', 'mystery', 'tense'
   function startMusic(){
     if(musicNode) return;
     const o1 = audioCtx.createOscillator(); const o2 = audioCtx.createOscillator();
-    const g = audioCtx.createGain(); g.gain.value = 0.05; // low volume
+    const g = audioCtx.createGain(); g.gain.value = 0.05;
     o1.type = 'sine'; o2.type = 'triangle';
     o1.frequency.value = 220; o2.frequency.value = 330;
     o1.connect(g); o2.connect(g); g.connect(masterGain);
     o1.start(); o2.start();
-    // simple arpeggio via periodic frequency changes
     musicNode = {o1,o2,g,step:0};
-    function tick(){ if(!musicNode) return; musicNode.step=(musicNode.step+1)%16; const base=180 + (musicNode.step%4)*20; o1.frequency.setTargetAtTime(base, audioCtx.currentTime,0.02); o2.frequency.setTargetAtTime(base*1.5, audioCtx.currentTime,0.02); setTimeout(tick,300); }
+    function tick(){
+      if(!musicNode) return;
+      musicNode.step = (musicNode.step+1)%16;
+      let base = 180 + (musicNode.step%4)*20;
+      if(musicMode === 'mystery'){ base = 120 + ((musicNode.step%6)*18); musicNode.o1.type='triangle'; musicNode.o2.type='sine'; }
+      if(musicMode === 'tense'){ base = 200 + ((musicNode.step%8)*28); musicNode.o1.type='sawtooth'; musicNode.o2.type='sine'; }
+      musicNode.o1.frequency.setTargetAtTime(base, audioCtx.currentTime,0.02);
+      musicNode.o2.frequency.setTargetAtTime(base*1.5, audioCtx.currentTime,0.02);
+      setTimeout(tick, 260);
+    }
     tick();
   }
-  function stopMusic(){ if(musicNode){ musicNode.o1.stop(); musicNode.o2.stop(); musicNode.g.disconnect(); musicNode=null; }}
+  function stopMusic(){ if(musicNode){ try{ musicNode.o1.stop(); musicNode.o2.stop(); }catch(e){} musicNode.g.disconnect(); musicNode=null; } }
+  function setMusicMode(m){ musicMode = m; if(musicNode){ /* slight ramp by changing gain for feeling */ musicNode.g.gain.setTargetAtTime(0.05, audioCtx.currentTime, 0.08); } }
 
+  // sound fx helpers
   function sfxTone(freq,dur=0.08,type='sine',gain=0.12){ if(muted) return; const o= audioCtx.createOscillator(); const g=audioCtx.createGain(); o.type=type; o.frequency.value=freq; g.gain.value=gain; o.connect(g); g.connect(masterGain); o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur); o.stop(audioCtx.currentTime + dur + 0.02); }
   function sfxCollect(){ sfxTone(880,0.06,'square',0.12); }
   function sfxJump(){ sfxTone(520,0.08,'sine',0.12); }
   function sfxHit(){ sfxTone(180,0.10,'sawtooth',0.14); }
   function sfxWin(){ sfxTone(1200,0.12,'sine',0.16); setTimeout(()=>sfxTone(1400,0.12,'sine',0.12),120); }
+  function sfxMystery(){ sfxTone(320,0.18,'triangle',0.06); }
 
   // jogo
   const W = 800, H = 420; // coordenadas lógicas
-  let game = { running:false, phase:0, phaseTime:0, totalTime:0, score:0, corn:0, obstacles:[], items:[], particles:[], ticket:null, lastTick:0, stun:0 };
+  let game = { running:false, phase:0, phaseTime:0, totalTime:0, score:0, corn:0, obstacles:[], items:[], particles:[], ticket:null, lastTick:0, stun:0, doors:[], correctDoorIndex:0, fireworks:[] };
 
-  // player fixo na tela (camera fixa) para evitar ficar fora da visão
-  const player = {x:100,y:H-72,w:18,h:26,vy:0,onGround:true,frame:0,animT:0,fast:0};
+  // player fixo na tela (camera fixa)
+  const player = {x:100,y:H-72,w:18,h:26,vy:0,onGround:true,frame:0,animT:0,autoJumpAssist:false};
 
   // input
   const keys = {};
@@ -170,43 +180,46 @@
   document.getElementById('replayBtn').addEventListener('click', ()=>{ finalEl.style.display='none'; resetAll(); startGame(); });
   document.getElementById('closeBtn').addEventListener('click', ()=>{ finalEl.style.display='none'; });
 
-  function jump(){ if(game.stun>0) return; if(player.onGround){ player.vy = -8.4; player.onGround=false; sfxJump(); }}
+  function jump(){ if(game.stun>0) return; if(player.onGround){ player.vy = -8.4; player.onGround=false; sfxJump(); } }
 
   // câmera/world speed control
   let worldSpeed = 1.6; // base
 
   // utility
   function rand(a,b){ return Math.random()*(b-a)+a; }
-  function spawnHeartParticles(x,y,count=12){ for(let i=0;i<count;i++){ game.particles.push({x,y,vx:rand(-1.4,1.4),vy:rand(-3,-0.6),life:rand(30,70),type:'heart',size:3,phase:rand(0,Math.PI*2)}); } }
+  function spawnHeartParticles(x,y,count=12){ for(let i=0;i<count;i++){ game.particles.push({x,y,vx:rand(-1.8,1.8),vy:rand(-3.2,-0.6),life:rand(30,70),type:'heart',size:3,phase:rand(0,Math.PI*2)}); } }
   function spawnParticles(x,y,color,count=10){ for(let i=0;i<count;i++){ game.particles.push({x,y,vx:rand(-1.6,1.6),vy:rand(-3,-0.4),life:rand(30,70),col:color,size:Math.random()*2+1}); } }
 
-  // spawn items/obstacles for phase1
+  // phase1 (unchanged)
   function resetPhase1(){ game.obstacles=[]; game.items=[]; game.particles=[]; game.corn=0; game.score=0; game.phaseTime=0; phaseLabel.textContent='1'; cornLabel.textContent='0';
-    // preload generate many corns across the "track"; they will move left
-    for(let i=0;i<40;i++){ // spread enough for 120s
+    // preload generate many corns across the "track"
+    for(let i=0;i<40;i++){
       const spacing = rand(160,360);
       const lastX = i===0 ? W + rand(120,240) : (game.items[i-1].x + spacing);
       game.items.push({type:'corn',x:lastX,y:H-92,w:14,h:12, collected:false});
-      // occasional obstacle near corn but easy to jump
       if(Math.random() < 0.5){ game.obstacles.push({x:lastX+rand(60,160),y:H-58,w:20,h:20,vx:- (1.2 + rand(0,0.6)), type:'rock'}); }
     }
+    // ensure music is calm
+    setMusicMode('calm');
   }
 
-  // phase2 corridor
+  // phase2 corridor of doors (as requested in earlier message)
   function resetPhase2(){ game.obstacles=[]; game.items=[]; game.particles=[]; game.phaseTime=0; phaseLabel.textContent='2';
-    // doors across fixed positions
+    // doors across fixed positions (they will shift left)
     game.doors = [];
     const total = 6; const correct = Math.floor(rand(0,total)); game.correctDoorIndex = correct;
-    for(let i=0;i<total;i++){ game.doors.push({x: W + i*160 + 220, y:H-120, w:64, h:92, index:i}); }
-    // obstacles lighter
-    for(let i=0;i<12;i++){ game.obstacles.push({x: W + i*90 + rand(80,200), y:H-58, w:18, h:18, vx: - (0.9 + rand(0,0.6)), type:'crate'}); }
+    for(let i=0;i<total;i++){ game.doors.push({x: W + i*160 + 220, y:H-120, w:64, h:92, index:i, blink:0}); }
+    // obstacles are lighter
+    for(let i=0;i<12;i++){ game.obstacles.push({x: W + i*90 + rand(80,200), y:H-58, w:18, h:18, vx: - (0.7 + rand(0,0.5)), type:'crate'}); }
+    // gentle mystery music
+    setMusicMode('mystery'); sfxMystery();
   }
 
-  // phase3 ticket
-  function resetPhase3(){ game.obstacles=[]; game.items=[]; game.particles=[]; game.phaseTime=0; phaseLabel.textContent='3'; spawnTicket(); }
-  function spawnTicket(){ game.ticket = {x: W + rand(120,360), y: rand(80,H-160), vx: -0.6, vy: rand(-0.2,0.2), life: 15*60 }; }
+  // phase3 ticket (caça ao ingresso)
+  function resetPhase3(){ game.obstacles=[]; game.items=[]; game.particles=[]; game.phaseTime=0; phaseLabel.textContent='3'; game.ticket=null; game.ticketTimer = 0; game.ticketInterval = 15; spawnTicket(); player.autoJumpAssist = true; setMusicMode('tense'); }
+  function spawnTicket(){ game.ticket = {x: W + rand(120,360), y: rand(80,H-160), vx: -0.6, vy: rand(-0.2,0.2), life: Math.floor(15*60)}; game.ticketSpawnedAt = game.totalTime; }
 
-  function resetAll(){ game.phase=0; game.phaseTime=0; game.score=0; game.items=[]; game.obstacles=[]; game.particles=[]; game.ticket=null; }
+  function resetAll(){ game.phase=0; game.phaseTime=0; game.score=0; game.items=[]; game.obstacles=[]; game.particles=[]; game.ticket=null; player.autoJumpAssist=false; setMusicMode('calm'); }
 
   // collisions simple
   function coll(a,b){ return !(a.x + a.w < b.x || a.x > b.x + b.w || a.y + a.h < b.y || a.y > b.y + b.h); }
@@ -215,68 +228,94 @@
   function update(dt){ if(!game.running) return; game.totalTime += dt/1000; game.phaseTime += dt/1000; if(game.stun>0) game.stun = Math.max(0, game.stun - dt/1000);
 
     // world movement (move obstacles/items left)
-    // ease up worldSpeed based on phase
-    let speed = worldSpeed * (game.phase===1 ? 1 : game.phase===2 ? 1.0 : 0.9);
+    let speed = worldSpeed * (game.phase===1 ? 1 : game.phase===2 ? 1.05 : 0.95);
+
     // player small lateral movement control
     if(keys['ArrowLeft']) player.x = Math.max(40, player.x - 2.8);
     if(keys['ArrowRight']) player.x = Math.min(220, player.x + 2.8);
 
-    // gravity
+    // gravity and auto-jump assist in phase3
+    if(player.autoJumpAssist && !player.onGround && player.vy > 0.6){
+      // soften fall a bit to make jumps easier
+      player.vy *= 0.98;
+    }
+
+    // small auto-jump: if phase3 and ticket is slightly above and player near, auto-jump to help
+    if(game.phase===3 && game.ticket){
+      const distX = (game.ticket.x - player.x);
+      if(distX < 140 && distX > 20 && player.onGround){
+        // gentle auto-jump
+        player.vy = -7.2; player.onGround=false; sfxJump();
+      }
+    }
+
+    // gravity application
     player.vy += 0.36; player.y += player.vy; if(player.y + player.h >= H-40){ player.y = H-40 - player.h; player.vy = 0; player.onGround = true; }
 
     // animate
     player.animT += dt; if(player.animT > 90){ player.animT = 0; player.frame = (player.frame + 1) % 4; }
 
     // move obstacles
-    for(let i=game.obstacles.length-1;i>=0;i--){ const o = game.obstacles[i]; o.x += o.vx - speed; if(o.x + o.w < -100) game.obstacles.splice(i,1); else if(coll(o, player) && game.stun<=0){ // collision
-        // lighter penalty: brief stun and small score deduction
+    for(let i=game.obstacles.length-1;i>=0;i--){ const o = game.obstacles[i]; o.x += (o.vx || 0) - speed; if(o.x + o.w < -100) game.obstacles.splice(i,1); else if(coll(o, player) && game.stun<=0){
+        // lighter penalty
         game.stun = 0.9; sfxHit(); game.score = Math.max(0, game.score - 8); spawnParticles(player.x + 6, player.y + 8, '#ff7');
       }
     }
 
-    // items (corns)
+    // phase-specific logic
     if(game.phase ===1){
       for(let i=game.items.length-1;i>=0;i--){ const it = game.items[i]; it.x -= speed; if(it.x + it.w < -80){ game.items.splice(i,1); continue; }
         if(!it.collected && coll(it, player)){
           it.collected = true; game.corn += 1; game.score += 12; sfxCollect(); spawnHeartParticles(player.x + 6, player.y - 6, 16);
         }
       }
-      // win condition: 20 corns or time
-      if(game.corn >= 20 || game.phaseTime >= 120){ // if not enough corn but time ended, proceed with what has
+      if(game.corn >= 20 || game.phaseTime >= 120){
         setTimeout(()=>{ nextPhase(); }, 600);
       }
     }
 
     if(game.phase===2){
-      // move doors and obstacles left
-      for(const d of game.doors){ d.x -= speed; }
-      for(let i=game.obstacles.length-1;i>=0;i--){ const o = game.obstacles[i]; o.x += o.vx - speed; if(o.x + o.w < -120) game.obstacles.splice(i,1); else if(coll(o, player) && game.stun<=0){ game.stun = 0.8; sfxHit(); game.score = Math.max(0, game.score - 6);} }
+      // move doors
+      for(const d of game.doors){ d.x -= speed; if(d.blink>0) d.blink = Math.max(0,d.blink - dt); }
+      for(let i=game.obstacles.length-1;i>=0;i--){ const o = game.obstacles[i]; o.x += o.vx - speed; if(o.x + o.w < -120) game.obstacles.splice(i,1); else if(coll(o, player) && game.stun<=0){ game.stun = 0.6; sfxHit(); game.score = Math.max(0, game.score - 6);} }
       // check door interaction
       for(const d of game.doors){ if(coll(d, player)){
-          if(d.index === game.correctDoorIndex){ sfxCollect(); spawnParticles(d.x + 20, d.y + 10, '#ffd'); setTimeout(()=> nextPhase(), 300); }
-          else { // wrong door: small penalty and send player slightly back but not full restart
-            sfxTone(240,0.08,'sawtooth',0.12); game.score = Math.max(0, game.score - 18); player.x = 100; game.stun = 0.9;
-            // make wrong door blink
-            d.x += 80; // push wrong door a bit to avoid immediate re-trigger
+          if(d.index === game.correctDoorIndex){
+            sfxCollect(); spawnParticles(d.x + 20, d.y + 10, '#ffd', 28);
+            // flash white and small message "Pronto para a próxima surpresa?"
+            flash('ok'); showTemporaryMessage('Pronto para a próxima surpresa?', 1400);
+            setTimeout(()=> nextPhase(), 900);
+          } else {
+            // wrong door: small penalty and reposition slightly back
+            sfxTone(240,0.08,'sawtooth',0.12); game.score = Math.max(0, game.score - 12); player.x = 100; game.stun = 0.9;
+            d.blink = 400; d.x += 80;
           }
         } }
       if(game.phaseTime >= 120){ setTimeout(()=> nextPhase(), 300); }
     }
 
     if(game.phase===3){
-      // move ticket towards left
-      if(game.ticket){ game.ticket.x += game.ticket.vx - speed; game.ticket.y += game.ticket.vy; game.ticket.life -= 1; if(game.ticket.x < 60 || game.ticket.x > W-40) game.ticket.vx *= -1; if(game.ticket.life <= 0){ spawnTicket(); game.score = Math.max(0, game.score - 30); sfxTone(200,0.06,'sine',0.09); }
+      // ticket movement + lifecycle
+      if(game.ticket){
+        game.ticket.x += game.ticket.vx - speed; game.ticket.y += game.ticket.vy; game.ticket.life -= 1;
+        if(game.ticket.x < 60 || game.ticket.x > W-40) game.ticket.vx *= -1;
+        if(game.ticket.life <= 0){ spawnTicket(); game.score = Math.max(0, game.score - 18); sfxTone(200,0.06,'sine',0.09); }
         if(coll(game.ticket, player)){
-          sfxWin(); spawnParticles(game.ticket.x + 8, game.ticket.y + 6, '#fff', 40); // win
-          showFinal(true);
+          // collected by touching
+          collectTicket();
         }
       }
+      // periodic respawn every 15s if none present or expired
+      if(!game.ticket){ game.ticketTimer += dt/1000; if(game.ticketTimer >= 15){ spawnTicket(); game.ticketTimer = 0; } }
       // obstacles
       for(let i=game.obstacles.length-1;i>=0;i--){ const o = game.obstacles[i]; o.x += o.vx - speed; if(o.x + o.w < -120) game.obstacles.splice(i,1); else if(coll(o,player) && game.stun<=0){ game.stun=0.8; sfxHit(); game.score = Math.max(0, game.score - 6); } }
-      if(game.phaseTime >= 120){ // time ended - reveal final anyway but note if ticket not collected
+      if(game.phaseTime >= 120){ // time ended - reveal final anyway
         setTimeout(()=> showFinal(false), 400);
       }
     }
+
+    // fireworks update (for visual effect after ticket)
+    for(let i=game.fireworks.length-1;i>=0;i--){ const f = game.fireworks[i]; f.life -= 1; for(const p of f.p){ p.x += p.vx; p.y += p.vy; p.vy += 0.06; } if(f.life<=0) game.fireworks.splice(i,1); }
 
     // particles update
     for(let i=game.particles.length-1;i>=0;i--){ const p=game.particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life--; if(p.life<=0) game.particles.splice(i,1); }
@@ -289,40 +328,57 @@
   }
 
   // rendering
-  function draw(){ ctx.clearRect(0,0,canvas.width,canvas.height); // background
-    // scale to logical W,H within canvas' displayed size
+  function draw(){ ctx.clearRect(0,0,canvas.width,canvas.height);
     const scaleX = (parseFloat(canvas.style.width) || 800) / W; const scaleY = (parseFloat(canvas.style.height) || 420) / H; ctx.save(); ctx.scale(scaleX, scaleY);
-    // sky
+    // background
     ctx.fillStyle = '#071726'; ctx.fillRect(0,0,W,H);
-    // distant parallax
+    // parallax / distant
     ctx.fillStyle = '#062a32'; ctx.fillRect(0,H-120,W,120);
     // ground
     ctx.fillStyle = '#0b2b36'; ctx.fillRect(0,H-40,W,40);
 
     // obstacles
-    ctx.fillStyle = '#6b6b6b'; for(const o of game.obstacles){ ctx.fillRect(o.x, o.y, o.w, o.h); ctx.fillStyle='rgba(0,0,0,0.12)'; ctx.fillRect(o.x+2, o.y+o.h-2, o.w, 2); ctx.fillStyle='#6b6b6b'; }
+    ctx.fillStyle = '#6b6b6b';
+    for(const o of game.obstacles){ ctx.fillRect(o.x, o.y, o.w, o.h); ctx.fillStyle='rgba(0,0,0,0.12)'; ctx.fillRect(o.x+2, o.y+o.h-2, o.w, 2); ctx.fillStyle='#6b6b6b'; }
 
-    // items corns
+    // items corns (phase1)
     if(game.phase===1){ for(const it of game.items){ if(it.collected) continue; ctx.fillStyle = '#ffd24a'; ctx.fillRect(it.x, it.y, it.w, it.h); ctx.fillStyle='#caa000'; ctx.fillRect(it.x+2, it.y+2, it.w-4, 4); } }
 
-    // doors
-    if(game.phase===2){ for(const d of game.doors){ // glow correct door
-        if(d.index === game.correctDoorIndex){ ctx.fillStyle = 'rgba(255,209,102,0.12)'; ctx.fillRect(d.x-6, d.y-6, d.w+12, d.h+12); }
+    // doors (phase2) — correct door glows discretely
+    if(game.phase===2){ for(const d of game.doors){
+        if(d.index === game.correctDoorIndex){
+          // subtle pulsating glow
+          const glowAlpha = 0.06 + (Math.sin((Date.now()%1200)/1200*Math.PI*2 )*0.03);
+          ctx.fillStyle = `rgba(255,209,102,${glowAlpha.toFixed(3)})`; ctx.fillRect(d.x-6, d.y-6, d.w+12, d.h+12);
+        }
+        // wrong door blink overlay
+        if(d.blink && d.blink>0){ ctx.fillStyle = 'rgba(255,80,80,0.18)'; ctx.fillRect(d.x-4, d.y-4, d.w+8, d.h+8); }
         ctx.fillStyle = '#3a3f4a'; ctx.fillRect(d.x, d.y, d.w, d.h); ctx.fillStyle='#caa15e'; ctx.fillRect(d.x + d.w - 12, d.y + d.h/2 - 6, 6, 6);
       } }
 
-    // ticket
-    if(game.phase===3 && game.ticket){ ctx.fillStyle = '#ffd8a6'; ctx.fillRect(game.ticket.x, game.ticket.y, 22, 12); ctx.fillStyle='#c47d00'; ctx.fillRect(game.ticket.x+6, game.ticket.y+2, 10, 4); }
+    // ticket (phase3)
+    if(game.phase===3 && game.ticket){ ctx.fillStyle = '#ffd8a6'; ctx.fillRect(game.ticket.x, game.ticket.y, 22, 12); ctx.fillStyle='#c47d00'; ctx.fillRect(game.ticket.x+6, game.ticket.y+2, 10, 4);
+      // small sparkle
+      ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fillRect(game.ticket.x+10, game.ticket.y-4, 2, 2);
+      // life bar above ticket
+      const lifeRatio = Math.max(0, game.ticket.life / (15*60));
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(game.ticket.x, game.ticket.y - 6, 22, 4);
+      ctx.fillStyle = '#6fe3ff'; ctx.fillRect(game.ticket.x, game.ticket.y - 6, 22*lifeRatio, 4);
+    }
 
-    // draw player (fixed)
+    // draw player
     drawPlayer(player.x, player.y, player.frame, player.onGround);
 
-    // particles (hearts & small)
-    for(const p of game.particles){ if(p.type==='heart'){ // draw small heart pixel
-        ctx.save(); ctx.translate(p.x, p.y); ctx.fillStyle = '#ff6b91'; ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(-1,0,2,0,Math.PI*2); ctx.arc(2,0,2,0,Math.PI*2); ctx.moveTo(-3,2); ctx.lineTo(2,8); ctx.fill(); ctx.restore(); }
-      else { ctx.fillStyle = p.col || '#fff'; ctx.fillRect(p.x, p.y, p.size, p.size); } }
+    // particles
+    for(const p of game.particles){ if(p.type==='heart'){ ctx.save(); ctx.translate(p.x, p.y); ctx.fillStyle = '#ff6b91'; ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(-1,0,2,0,Math.PI*2); ctx.arc(2,0,2,0,Math.PI*2); ctx.moveTo(-3,2); ctx.lineTo(2,8); ctx.fill(); ctx.restore(); } else { ctx.fillStyle = p.col || '#fff'; ctx.fillRect(p.x, p.y, p.size, p.size); } }
 
-    // HUD overlay (drawn by DOM too)
+    // fireworks (after ticket)
+    for(const f of game.fireworks){
+      for(const p of f.p){
+        ctx.fillStyle = p.col; ctx.fillRect(p.x, p.y, 2, 2);
+      }
+    }
+
     ctx.restore();
   }
 
@@ -334,8 +390,7 @@
     // head
     ctx.fillStyle = '#ffd7b3'; ctx.fillRect(2,-10,12,10);
     // legs animated
-    const lf = frame%4;
-    ctx.fillStyle = '#0b3b4a';
+    const lf = frame%4; ctx.fillStyle = '#0b3b4a';
     if(lf===0){ ctx.fillRect(2,10,5,12); ctx.fillRect(11,10,5,12); }
     if(lf===1){ ctx.fillRect(2,12,5,10); ctx.fillRect(11,8,5,14); }
     if(lf===2){ ctx.fillRect(2,10,5,12); ctx.fillRect(11,10,5,12); }
@@ -343,40 +398,80 @@
     if(!onGround){ ctx.fillStyle = '#fff'; ctx.fillRect(0,-14,3,3); }
     ctx.restore(); }
 
-  // flash overlay
-  let flashT = 0; let flashColor = 'rgba(255,255,255,0.06)';
-  function flash(type){ flashT = 180; flashColor = type==='error' ? 'rgba(180,20,20,0.22)' : 'rgba(255,220,140,0.12)'; }
+  // flash overlay + temporary messages
+  let flashT = 0; let flashColor = 'rgba(255,255,255,0.06)'; let tempMsg = null; let tempMsgT = 0;
+  function flash(type){ flashT = 180; flashColor = type==='error' ? 'rgba(180,20,20,0.22)' : 'rgba(255,255,255,0.22)'; }
   function drawFlash(){ if(flashT>0){ flashT -= 16; ctx.save(); const scaleX = (parseFloat(canvas.style.width) || 800) / W; const scaleY = (parseFloat(canvas.style.height) || 420) / H; ctx.scale(scaleX, scaleY); ctx.fillStyle = flashColor; ctx.fillRect(0,0,W,H); ctx.restore(); } }
+  function showTemporaryMessage(text, ms=1200){ tempMsg = text; tempMsgT = ms; setTimeout(()=>{ tempMsg = null; tempMsgT = 0; }, ms); }
 
   // main loop
-  function loop(ts){ if(!game.lastTick) game.lastTick = ts; const dt = ts - game.lastTick; game.lastTick = ts; update(dt); draw(); drawFlash(); requestAnimationFrame(loop); }
+  function loop(ts){ if(!game.lastTick) game.lastTick = ts; const dt = ts - game.lastTick; game.lastTick = ts; update(dt); draw(); drawFlash(); drawTempMessage(); requestAnimationFrame(loop); }
   requestAnimationFrame(loop);
+
+  function drawTempMessage(){
+    if(!tempMsg) return;
+    const scaleX = (parseFloat(canvas.style.width) || 800) / W; const scaleY = (parseFloat(canvas.style.height) || 420) / H; ctx.save(); ctx.scale(scaleX, scaleY);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(W/2 - 180, H/2 - 36, 360, 72);
+    ctx.fillStyle = '#fff'; ctx.font = '18px sans-serif'; ctx.textAlign='center'; ctx.fillText(tempMsg, W/2, H/2 + 6);
+    ctx.restore();
+  }
 
   // control functions
   function startGame(){ if(audioCtx.state === 'suspended') audioCtx.resume(); game.running = true; game.phase = 1; game.phaseTime = 0; startMusic(); resetPhase1(); startBtn.textContent = 'PAUSAR'; }
   function pauseGame(){ game.running = !game.running; startBtn.textContent = game.running ? 'PAUSAR' : 'CONTINUAR'; }
 
-  function nextPhase(){ if(game.phase ===1){ game.phase = 2; resetPhase2(); game.phaseTime = 0; flash('ok'); }
-    else if(game.phase ===2){ game.phase = 3; resetPhase3(); game.phaseTime = 0; flash('ok'); }
-    else if(game.phase ===3){ showFinal(true); }
+  function nextPhase(){
+    if(game.phase ===1){
+      game.phase = 2; resetPhase2(); game.phaseTime = 0; flash('ok');
+    } else if(game.phase ===2){
+      game.phase = 3; resetPhase3(); game.phaseTime = 0; flash('ok');
+    } else if(game.phase ===3){
+      showFinal(true);
+    }
   }
 
   // final
-  function showFinal(collectedTicket){ game.running = false; stopMusic(); finalEl.style.display = 'flex'; if(collectedTicket){ finalTitle.textContent = 'Convite desbloqueado!'; finalText.innerHTML = '💛 Com amor, Denise 💛<br>Você desbloqueou a surpresa:<br><strong>Vamos ao cinema?</strong>'; } else { finalTitle.textContent = 'Missão concluída'; finalText.innerHTML = '💛 Com amor, Denise 💛<br>Você desbloqueou a surpresa:<br><strong>Vamos ao cinema?</strong>'; } }
+  function showFinal(collectedTicket){
+    game.running = false; stopMusic();
+    finalEl.style.display = 'flex';
+    if(collectedTicket){
+      finalTitle.textContent = 'Convite desbloqueado!';
+      finalText.innerHTML = '💛 Com amor, Denise 💛<br>Agora que pegou a pipoca e os ingressos, vamos ao cinema?<br><br><button id="yesBtn" class="primary">Sim!</button> <button id="okBtn" class="ghost">Claro!</button>';
+      // attach same behavior to both
+      setTimeout(()=>{ const yes = document.getElementById('yesBtn'); const ok = document.getElementById('okBtn'); if(yes){ yes.addEventListener('click', ()=>{ showThankYou(); }); } if(ok){ ok.addEventListener('click', ()=>{ showThankYou(); }); } }, 80);
+    } else {
+      finalTitle.textContent = 'Missão concluída';
+      finalText.innerHTML = '💛 Com amor, Denise 💛<br>Agora que pegou a pipoca e os ingressos, vamos ao cinema?';
+    }
+  }
+  function showThankYou(){ finalText.innerHTML = '<strong>Perfeito — te espero! 🎬❤️</strong>'; sfxWin(); }
 
-  // click on ticket
+  // click on ticket (canvas)
   canvas.addEventListener('click', (e)=>{
-    if(game.phase===3 && game.ticket){ const r = canvas.getBoundingClientRect(); const scaleX = canvas.width / r.width; const scaleY = canvas.height / r.height; const cx = (e.clientX - r.left) * (canvas.width / r.width) / (canvas.width/parseFloat(canvas.style.width)); const cy = (e.clientY - r.top) * (canvas.height / r.height) / (canvas.height/parseFloat(canvas.style.height)); // approximated
-      // use logical coords
+    if(game.phase===3 && game.ticket){
+      const r = canvas.getBoundingClientRect();
       const logicalX = (e.clientX - r.left) * (parseFloat(canvas.style.width) / r.width);
       const logicalY = (e.clientY - r.top) * (parseFloat(canvas.style.height) / r.height);
-      // map to logical W,H
       const lx = logicalX * (W / parseFloat(canvas.style.width)); const ly = logicalY * (H / parseFloat(canvas.style.height));
-      if(lx > game.ticket.x && lx < game.ticket.x + 22 && ly > game.ticket.y && ly < game.ticket.y + 12){ sfxWin(); spawnParticles(game.ticket.x+8, game.ticket.y+6, '#fff', 40); showFinal(true); }
+      if(lx > game.ticket.x && lx < game.ticket.x + 22 && ly > game.ticket.y && ly < game.ticket.y + 12){ collectTicket(); }
     }
   });
 
-  // helper sfxTone accessible
+  function collectTicket(){
+    if(!game.ticket) return;
+    sfxWin(); spawnParticles(game.ticket.x + 8, game.ticket.y + 6, '#fff', 40);
+    // fireworks
+    const fw = { life: 90, p: [] };
+    const cx = game.ticket.x + 11, cy = game.ticket.y + 6;
+    for(let i=0;i<60;i++){ const ang = Math.random()*Math.PI*2; const sp = rand(1,4); fw.p.push({x:cx, y:cy, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, col: ['#ff6b91','#ffd166','#6fe3ff','#ffd8a6'][Math.floor(Math.random()*4)]}); }
+    game.fireworks.push(fw);
+    spawnHeartParticles(cx, cy, 28);
+    game.ticket = null;
+    // short delay then final
+    setTimeout(()=> showFinal(true), 900);
+  }
+
+  // helper sfxTone accessible (exposed earlier duplicate guard)
   function sfxTone(freq,dur,type,gain){ if(muted) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.type = type; o.frequency.value = freq; g.gain.value = gain; o.connect(g); g.connect(masterGain); o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur); o.stop(audioCtx.currentTime + dur + 0.02); }
 
   // initial state
@@ -386,5 +481,4 @@
 </script>
 </body>
 </html>
-
 
