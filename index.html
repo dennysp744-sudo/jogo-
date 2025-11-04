@@ -1,484 +1,872 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>SURPRESA!!</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Missão Popcorn — Desbloqueie a surpresa</title>
 <style>
-  :root{--bg:#071726;--panel:#0f1724;--accent:#ffd166;--muted:#9aa8bf}
-  html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system,'Segoe UI',Roboto,Arial;background:linear-gradient(180deg,#071027 0%, #071c2a 100%);color:#e6eef7}
-  .wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px}
-  .panel{width:100%;max-width:980px;background:rgba(10,14,24,0.64);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 10px 30px rgba(2,6,23,0.6)}
-  header{display:flex;justify-content:space-between;align-items:center;gap:8px}
-  h1{margin:0;font-size:18px;color:var(--accent)}
-  .controls{display:flex;gap:8px;align-items:center}
-  button.primary{background:var(--accent);border:none;padding:8px 14px;border-radius:10px;font-weight:700;cursor:pointer}
-  button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);padding:6px 10px;border-radius:8px;cursor:pointer}
-  .row{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
-  .stage{margin-top:12px;background:linear-gradient(180deg,#072a35,#061822);padding:8px;border-radius:10px;display:flex;justify-content:center}
-  canvas{border-radius:6px;background:#071726;display:block;max-width:100%;height:auto}
-  footer{display:flex;justify-content:space-between;align-items:center;margin-top:10px;color:var(--muted);font-size:13px}
-  .hud{display:flex;gap:12px;align-items:center}
-  .big{font-weight:800;color:#fff}
-  /* mobile controls overlay */
-  .touch-controls{position:fixed;left:12px;bottom:12px;display:flex;gap:10px;z-index:60}
-  .touch-controls .btn{width:56px;height:56px;border-radius:12px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;user-select:none}
-  .jump-btn{position:fixed;right:18px;bottom:12px;width:72px;height:72px;border-radius:18px;background:linear-gradient(180deg,#ffd166,#ffb64d);display:flex;align-items:center;justify-content:center;font-weight:800;color:#072026;z-index:60}
-  .finalScreen{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(0,0,0,0.55),rgba(0,0,0,0.85));z-index:140}
-  .cardFinal{background:linear-gradient(180deg,#071b2a,#072033);border-radius:12px;padding:22px;border:1px solid rgba(255,255,255,0.06);text-align:center;color:#fff;max-width:560px}
-  .cardFinal h2{margin:0 0 8px 0}
-  .small-muted{color:var(--muted);font-size:13px}
-  .door-glow{box-shadow:0 0 14px rgba(255,209,102,0.18);}
-  @media (max-width:520px){ .touch-controls .btn{width:48px;height:48px} .jump-btn{width:64px;height:64px} }
+  :root{
+    --bg:#0b1020; --panel:#0f1724; --accent:#ffd166; --muted:#9aa4b2;
+  }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+  body{display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(180deg,#071022 0%, #0b1830 100%);color:#e6eef8;}
+  .container{width:100%;max-width:1100px;padding:16px;box-sizing:border-box;}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  h1{margin:0;font-size:18px;font-weight:600;color:var(--accent);}
+  .controls{display:flex;gap:8px;align-items:center;}
+  .panel{background:rgba(255,255,255,0.03);padding:10px;border-radius:10px;box-shadow:0 6px 18px rgba(2,6,23,0.6);}
+  #uiTop{display:flex;gap:12px;align-items:center;}
+  #gameCanvas{width:100%;height:64vh;border-radius:8px;background:#081123;display:block;touch-action:none;}
+  .row{display:flex;gap:8px;align-items:center;}
+  .muted{color:var(--muted);font-size:13px;}
+  button{background:var(--accent);border:none;color:#071022;padding:8px 12px;border-radius:8px;font-weight:600;cursor:pointer;}
+  button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--accent);}
+  .slider{width:140px;}
+  .center{display:flex;align-items:center;justify-content:center;flex-direction:column;}
+  footer{margin-top:10px;color:var(--muted);font-size:13px;text-align:center;}
+  /* Small-screen tweaks */
+  @media(max-width:600px){
+    h1{font-size:16px;}
+    .slider{width:100px;}
+    #gameCanvas{height:55vh;}
+  }
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="panel" role="application" aria-label="Missão Cinema - Desbloqueie a Surpresa">
-      <header>
-        <h1> Desbloqueie a Surpresa</h1>
-        <div class="controls">
-          <button id="startBtn" class="primary">INICIAR MISSÃO</button>
-          <button id="muteBtn" class="ghost">Som</button>
+  <div class="container">
+    <header>
+      <h1>Missão Popcorn — desbloqueie a surpresa</h1>
+      <div class="controls">
+        <div class="panel" id="uiTop">
+          <div class="row"><span class="muted">Fase:</span> <strong id="phaseLabel">1</strong></div>
+          <div class="row"><span class="muted">Tempo:</span> <strong id="timerLabel">00:00</strong></div>
+          <div class="row"><span class="muted">Itens:</span> <strong id="itemsLabel">Milho 0 / 4</strong></div>
+          <div class="row"><span class="muted">Pontos:</span> <strong id="scoreLabel">0</strong></div>
         </div>
-      </header>
-
-      <div class="row">
-        <div class="hud">
-          <div class="big">Fase: <span id="phaseLabel">—</span></div>
-          <div>Tempo: <span id="timeLabel">0:00</span></div>
-          <div>Milhos: <span id="cornLabel">0</span>/20</div>
-          <div>Pontos: <span id="scoreLabel">0</span></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <label for="volume">Volume</label>
-          <input id="volume" type="range" min="0" max="1" step="0.01" value="0.6" />
+        <div class="panel" style="margin-left:8px;display:flex;gap:8px;align-items:center;">
+          <label class="muted">Volume</label>
+          <input type="range" id="volumeRange" class="slider" min="0" max="1" step="0.01" value="0.6">
+          <button id="startBtn">INICIAR MISSÃO</button>
         </div>
       </div>
+    </header>
 
-      <div class="stage">
-        <canvas id="game" width="800" height="420" aria-label="Área do jogo"></canvas>
-      </div>
+    <canvas id="gameCanvas" class="panel"></canvas>
 
-      <footer>
-        <div class="small-muted">Controles: ← → ou toque nas setas | ↑ ou botão pular | Toque no ingresso para coletar</div>
-        <div class="small-muted">Com amor, Denise❤️ </div>
-      </footer>
-    </div>
-  </div>
-
-  <!-- Touch controls -->
-  <div class="touch-controls" aria-hidden="false">
-    <div id="leftBtn" class="btn">◀</div>
-    <div id="rightBtn" class="btn">▶</div>
-  </div>
-  <div id="jumpBtn" class="jump-btn">▲</div>
-
-  <div id="final" class="finalScreen" role="dialog" aria-modal="true">
-    <div class="cardFinal">
-      <h2 id="finalTitle">Parabéns!</h2>
-      <p id="finalText">Você desbloqueou a surpresa.</p>
-      <p class="small-muted">Aperte reiniciar para jogar novamente.</p>
-      <div style="margin-top:14px;display:flex;gap:10px;justify-content:center;">
-        <button id="replayBtn" class="primary">Jogar novamente</button>
-        <button id="closeBtn" class="ghost">Fechar</button>
+    <div style="display:flex;gap:8px;margin-top:8px;align-items:center;justify-content:space-between;">
+      <div class="muted">Controles: ◀ ▶ para mover • ▲ pular • toque/arraste para mobile</div>
+      <div style="display:flex;gap:8px;">
+        <button id="restartBtn" class="ghost">Reiniciar Jogo</button>
+        <button id="muteBtn" class="ghost">🔊</button>
       </div>
     </div>
+
+    <footer>
+      Desenvolvido com atenção aos requisitos — fases rápidas (≤ 2 min cada). Boa sorte!
+    </footer>
   </div>
 
 <script>
 /*
-  Versão Denise — fases adicionais integradas:
-  - Fase 1: coletar 20 milhos (120s)  (mantido)
-  - Fase 2: corredor das portas (120s) — enfeite discreto, porta correta brilha, música muda p/ mistério, ao entrar flash branco + "Pronto para a próxima surpresa?"
-  - Fase 3: caça ao ingresso (120s) — ingresso reaparece a cada 15s em pontos aleatórios, vida curta, clique/toque coleta, fogos + corações na coleta
-  - tudo em um único arquivo, trilha via WebAudio (osciladores), SFX internos
+  Missão Popcorn
+  - Único arquivo HTML para fácil upload ao GitHub.
+  - Canvas 2D, responsivo.
+  - Sons via WebAudio (sem arquivos externos).
+  - Fases: 1 (coleta), 2 (corredor portas), 3 (caça ingresso).
+  - Volume via slider. Reinício seguro mantém personagem referência.
 */
 
-(function(){
-  // canvas e escala
-  const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d');
-  function resizeCanvas(){
-    const ratio = window.devicePixelRatio || 1;
-    const w = Math.min(window.innerWidth - 32, 920);
-    canvas.style.width = w + 'px';
-    canvas.style.height = Math.round(w * (420/800)) + 'px';
-    canvas.width = Math.round(w * ratio);
-    canvas.height = Math.round((w * (420/800)) * ratio);
-    ctx.setTransform(ratio,0,0,ratio,0,0);
-  }
-  window.addEventListener('resize', resizeCanvas); resizeCanvas();
+/* ====== Setup básico ====== */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false });
 
-  // audio
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  const audioCtx = new AudioCtx();
-  let masterGain = audioCtx.createGain(); masterGain.gain.value = 0.6; masterGain.connect(audioCtx.destination);
-  let muted = false;
+function fitCanvas(){
+  canvas.width = Math.floor(canvas.clientWidth * devicePixelRatio);
+  canvas.height = Math.floor(canvas.clientHeight * devicePixelRatio);
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+}
+fitCanvas();
+window.addEventListener('resize', () => {
+  fitCanvas();
+});
 
-  // music nodes + state
-  let musicNode = null;
-  let musicMode = 'calm'; // 'calm', 'mystery', 'tense'
-  function startMusic(){
-    if(musicNode) return;
-    const o1 = audioCtx.createOscillator(); const o2 = audioCtx.createOscillator();
-    const g = audioCtx.createGain(); g.gain.value = 0.05;
-    o1.type = 'sine'; o2.type = 'triangle';
-    o1.frequency.value = 220; o2.frequency.value = 330;
-    o1.connect(g); o2.connect(g); g.connect(masterGain);
-    o1.start(); o2.start();
-    musicNode = {o1,o2,g,step:0};
-    function tick(){
-      if(!musicNode) return;
-      musicNode.step = (musicNode.step+1)%16;
-      let base = 180 + (musicNode.step%4)*20;
-      if(musicMode === 'mystery'){ base = 120 + ((musicNode.step%6)*18); musicNode.o1.type='triangle'; musicNode.o2.type='sine'; }
-      if(musicMode === 'tense'){ base = 200 + ((musicNode.step%8)*28); musicNode.o1.type='sawtooth'; musicNode.o2.type='sine'; }
-      musicNode.o1.frequency.setTargetAtTime(base, audioCtx.currentTime,0.02);
-      musicNode.o2.frequency.setTargetAtTime(base*1.5, audioCtx.currentTime,0.02);
-      setTimeout(tick, 260);
-    }
-    tick();
-  }
-  function stopMusic(){ if(musicNode){ try{ musicNode.o1.stop(); musicNode.o2.stop(); }catch(e){} musicNode.g.disconnect(); musicNode=null; } }
-  function setMusicMode(m){ musicMode = m; if(musicNode){ /* slight ramp by changing gain for feeling */ musicNode.g.gain.setTargetAtTime(0.05, audioCtx.currentTime, 0.08); } }
+/* ====== WebAudio simples para efeitos ====== */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const masterGain = audioCtx.createGain(); masterGain.gain.value = 0.6; masterGain.connect(audioCtx.destination);
 
-  // sound fx helpers
-  function sfxTone(freq,dur=0.08,type='sine',gain=0.12){ if(muted) return; const o= audioCtx.createOscillator(); const g=audioCtx.createGain(); o.type=type; o.frequency.value=freq; g.gain.value=gain; o.connect(g); g.connect(masterGain); o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur); o.stop(audioCtx.currentTime + dur + 0.02); }
-  function sfxCollect(){ sfxTone(880,0.06,'square',0.12); }
-  function sfxJump(){ sfxTone(520,0.08,'sine',0.12); }
-  function sfxHit(){ sfxTone(180,0.10,'sawtooth',0.14); }
-  function sfxWin(){ sfxTone(1200,0.12,'sine',0.16); setTimeout(()=>sfxTone(1400,0.12,'sine',0.12),120); }
-  function sfxMystery(){ sfxTone(320,0.18,'triangle',0.06); }
+function playBeep({freq=440, type='sine', time=0.04, gain=0.15}={}){
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.value = gain;
+  o.connect(g); g.connect(masterGain);
+  o.start(); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + time);
+  o.stop(audioCtx.currentTime + time + 0.02);
+}
 
-  // jogo
-  const W = 800, H = 420; // coordenadas lógicas
-  let game = { running:false, phase:0, phaseTime:0, totalTime:0, score:0, corn:0, obstacles:[], items:[], particles:[], ticket:null, lastTick:0, stun:0, doors:[], correctDoorIndex:0, fireworks:[] };
+function playClick(){ playBeep({freq:880,time:0.03,gain:0.08,type:'square'}); }
+function playCollect(){ playBeep({freq:660,time:0.08,gain:0.12,type:'sine'}); }
+function playJump(){ playBeep({freq:520,time:0.06,gain:0.1,type:'triangle'}); }
+function playWin(){ playBeep({freq:980,time:0.18,gain:0.14,type:'sawtooth'}); }
 
-  // player fixo na tela (camera fixa)
-  const player = {x:100,y:H-72,w:18,h:26,vy:0,onGround:true,frame:0,animT:0,autoJumpAssist:false};
+/* Volume control */
+const volumeRange = document.getElementById('volumeRange');
+volumeRange.addEventListener('input', e => { masterGain.gain.value = +e.target.value; });
+document.getElementById('muteBtn').addEventListener('click', ()=>{
+  if (masterGain.gain.value>0){ masterGain.gain.value = 0; document.getElementById('muteBtn').textContent = '🔈'; }
+  else { masterGain.gain.value = +volumeRange.value; document.getElementById('muteBtn').textContent = '🔊'; }
+});
 
-  // input
-  const keys = {};
-  window.addEventListener('keydown', e=>{ keys[e.key]=true; if(e.key===' '||e.key==='ArrowUp') jump(); if(!game.running && e.key==='Enter') startGame(); });
-  window.addEventListener('keyup', e=>{ keys[e.key]=false; });
-  // touch buttons
-  const leftBtn = document.getElementById('leftBtn'); const rightBtn = document.getElementById('rightBtn'); const jumpBtn = document.getElementById('jumpBtn');
-  leftBtn.addEventListener('pointerdown', ()=>keys['ArrowLeft']=true); leftBtn.addEventListener('pointerup', ()=>keys['ArrowLeft']=false);
-  rightBtn.addEventListener('pointerdown', ()=>keys['ArrowRight']=true); rightBtn.addEventListener('pointerup', ()=>keys['ArrowRight']=false);
-  jumpBtn.addEventListener('pointerdown', ()=>jump());
+/* ====== Estado do jogo e utilitários ====== */
+let lastTime = 0;
+let running = false;
+let phase = 0; // 0 menu, 1 fase1, 2 fase2, 3 fase3, 4 final
+const MAX_PHASE_TIME = 120; // segundos por fase (<=2min)
+let phaseTimer = 0;
+let score = 0;
+let cornCount = 0; // milhos coletados
+let popcornPacks = 0; // 1 pacote = 2 milhos, need 2 pacotes => 4 milhos
+let particles = [];
+let obstacles = [];
+let items = [];
+let powerUps = [];
+let doors = [];
+let ticket = null;
+let player = null;
+let keys = {};
+let touchState = { startX:0, startY:0, endX:0, endY:0, swiping:false };
+let showMessage = null;
+const ui = {
+  phaseLabel: document.getElementById('phaseLabel'),
+  timerLabel: document.getElementById('timerLabel'),
+  itemsLabel: document.getElementById('itemsLabel'),
+  scoreLabel: document.getElementById('scoreLabel'),
+  startBtn: document.getElementById('startBtn'),
+  restartBtn: document.getElementById('restartBtn'),
+};
 
-  // UI
-  const phaseLabel = document.getElementById('phaseLabel'); const timeLabel = document.getElementById('timeLabel'); const scoreLabel = document.getElementById('scoreLabel'); const cornLabel = document.getElementById('cornLabel');
-  const startBtn = document.getElementById('startBtn'); const muteBtn = document.getElementById('muteBtn'); const volumeEl = document.getElementById('volume');
-  const finalEl = document.getElementById('final'); const finalTitle = document.getElementById('finalTitle'); const finalText = document.getElementById('finalText');
+ui.startBtn.addEventListener('click', () => {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (!running) startGame();
+});
+ui.restartBtn.addEventListener('click', () => restartGame());
 
-  volumeEl.addEventListener('input', ()=>{ masterGain.gain.value = parseFloat(volumeEl.value); });
-  muteBtn.addEventListener('click', ()=>{ muted = !muted; muteBtn.textContent = muted ? 'Sem som' : 'Som'; });
+/* ====== Personagem (persistente) ====== */
+function createPlayer(){
+  return {
+    x: 80, y: 0, width: 36, height: 48,
+    vx: 0, vy: 0, speed: 160, jumpPower: 340,
+    onGround: false, animFrame: 0, facing: 1,
+    shieldUntil:0, speedUntil:0
+  };
+}
+player = createPlayer();
 
-  startBtn.addEventListener('click', ()=>{ if(!game.running) startGame(); else pauseGame(); });
-  document.getElementById('replayBtn').addEventListener('click', ()=>{ finalEl.style.display='none'; resetAll(); startGame(); });
-  document.getElementById('closeBtn').addEventListener('click', ()=>{ finalEl.style.display='none'; });
-
-  function jump(){ if(game.stun>0) return; if(player.onGround){ player.vy = -8.4; player.onGround=false; sfxJump(); } }
-
-  // câmera/world speed control
-  let worldSpeed = 1.6; // base
-
-  // utility
-  function rand(a,b){ return Math.random()*(b-a)+a; }
-  function spawnHeartParticles(x,y,count=12){ for(let i=0;i<count;i++){ game.particles.push({x,y,vx:rand(-1.8,1.8),vy:rand(-3.2,-0.6),life:rand(30,70),type:'heart',size:3,phase:rand(0,Math.PI*2)}); } }
-  function spawnParticles(x,y,color,count=10){ for(let i=0;i<count;i++){ game.particles.push({x,y,vx:rand(-1.6,1.6),vy:rand(-3,-0.4),life:rand(30,70),col:color,size:Math.random()*2+1}); } }
-
-  // phase1 (unchanged)
-  function resetPhase1(){ game.obstacles=[]; game.items=[]; game.particles=[]; game.corn=0; game.score=0; game.phaseTime=0; phaseLabel.textContent='1'; cornLabel.textContent='0';
-    // preload generate many corns across the "track"
-    for(let i=0;i<40;i++){
-      const spacing = rand(160,360);
-      const lastX = i===0 ? W + rand(120,240) : (game.items[i-1].x + spacing);
-      game.items.push({type:'corn',x:lastX,y:H-92,w:14,h:12, collected:false});
-      if(Math.random() < 0.5){ game.obstacles.push({x:lastX+rand(60,160),y:H-58,w:20,h:20,vx:- (1.2 + rand(0,0.6)), type:'rock'}); }
-    }
-    // ensure music is calm
-    setMusicMode('calm');
-  }
-
-  // phase2 corridor of doors (as requested in earlier message)
-  function resetPhase2(){ game.obstacles=[]; game.items=[]; game.particles=[]; game.phaseTime=0; phaseLabel.textContent='2';
-    // doors across fixed positions (they will shift left)
-    game.doors = [];
-    const total = 6; const correct = Math.floor(rand(0,total)); game.correctDoorIndex = correct;
-    for(let i=0;i<total;i++){ game.doors.push({x: W + i*160 + 220, y:H-120, w:64, h:92, index:i, blink:0}); }
-    // obstacles are lighter
-    for(let i=0;i<12;i++){ game.obstacles.push({x: W + i*90 + rand(80,200), y:H-58, w:18, h:18, vx: - (0.7 + rand(0,0.5)), type:'crate'}); }
-    // gentle mystery music
-    setMusicMode('mystery'); sfxMystery();
-  }
-
-  // phase3 ticket (caça ao ingresso)
-  function resetPhase3(){ game.obstacles=[]; game.items=[]; game.particles=[]; game.phaseTime=0; phaseLabel.textContent='3'; game.ticket=null; game.ticketTimer = 0; game.ticketInterval = 15; spawnTicket(); player.autoJumpAssist = true; setMusicMode('tense'); }
-  function spawnTicket(){ game.ticket = {x: W + rand(120,360), y: rand(80,H-160), vx: -0.6, vy: rand(-0.2,0.2), life: Math.floor(15*60)}; game.ticketSpawnedAt = game.totalTime; }
-
-  function resetAll(){ game.phase=0; game.phaseTime=0; game.score=0; game.items=[]; game.obstacles=[]; game.particles=[]; game.ticket=null; player.autoJumpAssist=false; setMusicMode('calm'); }
-
-  // collisions simple
-  function coll(a,b){ return !(a.x + a.w < b.x || a.x > b.x + b.w || a.y + a.h < b.y || a.y > b.y + b.h); }
-
-  // update loop
-  function update(dt){ if(!game.running) return; game.totalTime += dt/1000; game.phaseTime += dt/1000; if(game.stun>0) game.stun = Math.max(0, game.stun - dt/1000);
-
-    // world movement (move obstacles/items left)
-    let speed = worldSpeed * (game.phase===1 ? 1 : game.phase===2 ? 1.05 : 0.95);
-
-    // player small lateral movement control
-    if(keys['ArrowLeft']) player.x = Math.max(40, player.x - 2.8);
-    if(keys['ArrowRight']) player.x = Math.min(220, player.x + 2.8);
-
-    // gravity and auto-jump assist in phase3
-    if(player.autoJumpAssist && !player.onGround && player.vy > 0.6){
-      // soften fall a bit to make jumps easier
-      player.vy *= 0.98;
-    }
-
-    // small auto-jump: if phase3 and ticket is slightly above and player near, auto-jump to help
-    if(game.phase===3 && game.ticket){
-      const distX = (game.ticket.x - player.x);
-      if(distX < 140 && distX > 20 && player.onGround){
-        // gentle auto-jump
-        player.vy = -7.2; player.onGround=false; sfxJump();
-      }
-    }
-
-    // gravity application
-    player.vy += 0.36; player.y += player.vy; if(player.y + player.h >= H-40){ player.y = H-40 - player.h; player.vy = 0; player.onGround = true; }
-
-    // animate
-    player.animT += dt; if(player.animT > 90){ player.animT = 0; player.frame = (player.frame + 1) % 4; }
-
-    // move obstacles
-    for(let i=game.obstacles.length-1;i>=0;i--){ const o = game.obstacles[i]; o.x += (o.vx || 0) - speed; if(o.x + o.w < -100) game.obstacles.splice(i,1); else if(coll(o, player) && game.stun<=0){
-        // lighter penalty
-        game.stun = 0.9; sfxHit(); game.score = Math.max(0, game.score - 8); spawnParticles(player.x + 6, player.y + 8, '#ff7');
-      }
-    }
-
-    // phase-specific logic
-    if(game.phase ===1){
-      for(let i=game.items.length-1;i>=0;i--){ const it = game.items[i]; it.x -= speed; if(it.x + it.w < -80){ game.items.splice(i,1); continue; }
-        if(!it.collected && coll(it, player)){
-          it.collected = true; game.corn += 1; game.score += 12; sfxCollect(); spawnHeartParticles(player.x + 6, player.y - 6, 16);
-        }
-      }
-      if(game.corn >= 20 || game.phaseTime >= 120){
-        setTimeout(()=>{ nextPhase(); }, 600);
-      }
-    }
-
-    if(game.phase===2){
-      // move doors
-      for(const d of game.doors){ d.x -= speed; if(d.blink>0) d.blink = Math.max(0,d.blink - dt); }
-      for(let i=game.obstacles.length-1;i>=0;i--){ const o = game.obstacles[i]; o.x += o.vx - speed; if(o.x + o.w < -120) game.obstacles.splice(i,1); else if(coll(o, player) && game.stun<=0){ game.stun = 0.6; sfxHit(); game.score = Math.max(0, game.score - 6);} }
-      // check door interaction
-      for(const d of game.doors){ if(coll(d, player)){
-          if(d.index === game.correctDoorIndex){
-            sfxCollect(); spawnParticles(d.x + 20, d.y + 10, '#ffd', 28);
-            // flash white and small message "Pronto para a próxima surpresa?"
-            flash('ok'); showTemporaryMessage('Pronto para a próxima surpresa?', 1400);
-            setTimeout(()=> nextPhase(), 900);
-          } else {
-            // wrong door: small penalty and reposition slightly back
-            sfxTone(240,0.08,'sawtooth',0.12); game.score = Math.max(0, game.score - 12); player.x = 100; game.stun = 0.9;
-            d.blink = 400; d.x += 80;
-          }
-        } }
-      if(game.phaseTime >= 120){ setTimeout(()=> nextPhase(), 300); }
-    }
-
-    if(game.phase===3){
-      // ticket movement + lifecycle
-      if(game.ticket){
-        game.ticket.x += game.ticket.vx - speed; game.ticket.y += game.ticket.vy; game.ticket.life -= 1;
-        if(game.ticket.x < 60 || game.ticket.x > W-40) game.ticket.vx *= -1;
-        if(game.ticket.life <= 0){ spawnTicket(); game.score = Math.max(0, game.score - 18); sfxTone(200,0.06,'sine',0.09); }
-        if(coll(game.ticket, player)){
-          // collected by touching
-          collectTicket();
-        }
-      }
-      // periodic respawn every 15s if none present or expired
-      if(!game.ticket){ game.ticketTimer += dt/1000; if(game.ticketTimer >= 15){ spawnTicket(); game.ticketTimer = 0; } }
-      // obstacles
-      for(let i=game.obstacles.length-1;i>=0;i--){ const o = game.obstacles[i]; o.x += o.vx - speed; if(o.x + o.w < -120) game.obstacles.splice(i,1); else if(coll(o,player) && game.stun<=0){ game.stun=0.8; sfxHit(); game.score = Math.max(0, game.score - 6); } }
-      if(game.phaseTime >= 120){ // time ended - reveal final anyway
-        setTimeout(()=> showFinal(false), 400);
-      }
-    }
-
-    // fireworks update (for visual effect after ticket)
-    for(let i=game.fireworks.length-1;i>=0;i--){ const f = game.fireworks[i]; f.life -= 1; for(const p of f.p){ p.x += p.vx; p.y += p.vy; p.vy += 0.06; } if(f.life<=0) game.fireworks.splice(i,1); }
-
-    // particles update
-    for(let i=game.particles.length-1;i>=0;i--){ const p=game.particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life--; if(p.life<=0) game.particles.splice(i,1); }
-
-    // update HUD
-    cornLabel.textContent = String(game.corn);
-    scoreLabel.textContent = String(Math.max(0, Math.round(game.score)));
-    // update timer display
-    const remaining = Math.max(0, Math.floor(120 - game.phaseTime)); const mm = Math.floor(remaining/60); const ss = remaining%60; timeLabel.textContent = `${mm}:${ss.toString().padStart(2,'0')}`;
-  }
-
-  // rendering
-  function draw(){ ctx.clearRect(0,0,canvas.width,canvas.height);
-    const scaleX = (parseFloat(canvas.style.width) || 800) / W; const scaleY = (parseFloat(canvas.style.height) || 420) / H; ctx.save(); ctx.scale(scaleX, scaleY);
-    // background
-    ctx.fillStyle = '#071726'; ctx.fillRect(0,0,W,H);
-    // parallax / distant
-    ctx.fillStyle = '#062a32'; ctx.fillRect(0,H-120,W,120);
-    // ground
-    ctx.fillStyle = '#0b2b36'; ctx.fillRect(0,H-40,W,40);
-
-    // obstacles
-    ctx.fillStyle = '#6b6b6b';
-    for(const o of game.obstacles){ ctx.fillRect(o.x, o.y, o.w, o.h); ctx.fillStyle='rgba(0,0,0,0.12)'; ctx.fillRect(o.x+2, o.y+o.h-2, o.w, 2); ctx.fillStyle='#6b6b6b'; }
-
-    // items corns (phase1)
-    if(game.phase===1){ for(const it of game.items){ if(it.collected) continue; ctx.fillStyle = '#ffd24a'; ctx.fillRect(it.x, it.y, it.w, it.h); ctx.fillStyle='#caa000'; ctx.fillRect(it.x+2, it.y+2, it.w-4, 4); } }
-
-    // doors (phase2) — correct door glows discretely
-    if(game.phase===2){ for(const d of game.doors){
-        if(d.index === game.correctDoorIndex){
-          // subtle pulsating glow
-          const glowAlpha = 0.06 + (Math.sin((Date.now()%1200)/1200*Math.PI*2 )*0.03);
-          ctx.fillStyle = `rgba(255,209,102,${glowAlpha.toFixed(3)})`; ctx.fillRect(d.x-6, d.y-6, d.w+12, d.h+12);
-        }
-        // wrong door blink overlay
-        if(d.blink && d.blink>0){ ctx.fillStyle = 'rgba(255,80,80,0.18)'; ctx.fillRect(d.x-4, d.y-4, d.w+8, d.h+8); }
-        ctx.fillStyle = '#3a3f4a'; ctx.fillRect(d.x, d.y, d.w, d.h); ctx.fillStyle='#caa15e'; ctx.fillRect(d.x + d.w - 12, d.y + d.h/2 - 6, 6, 6);
-      } }
-
-    // ticket (phase3)
-    if(game.phase===3 && game.ticket){ ctx.fillStyle = '#ffd8a6'; ctx.fillRect(game.ticket.x, game.ticket.y, 22, 12); ctx.fillStyle='#c47d00'; ctx.fillRect(game.ticket.x+6, game.ticket.y+2, 10, 4);
-      // small sparkle
-      ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fillRect(game.ticket.x+10, game.ticket.y-4, 2, 2);
-      // life bar above ticket
-      const lifeRatio = Math.max(0, game.ticket.life / (15*60));
-      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(game.ticket.x, game.ticket.y - 6, 22, 4);
-      ctx.fillStyle = '#6fe3ff'; ctx.fillRect(game.ticket.x, game.ticket.y - 6, 22*lifeRatio, 4);
-    }
-
-    // draw player
-    drawPlayer(player.x, player.y, player.frame, player.onGround);
-
-    // particles
-    for(const p of game.particles){ if(p.type==='heart'){ ctx.save(); ctx.translate(p.x, p.y); ctx.fillStyle = '#ff6b91'; ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(-1,0,2,0,Math.PI*2); ctx.arc(2,0,2,0,Math.PI*2); ctx.moveTo(-3,2); ctx.lineTo(2,8); ctx.fill(); ctx.restore(); } else { ctx.fillStyle = p.col || '#fff'; ctx.fillRect(p.x, p.y, p.size, p.size); } }
-
-    // fireworks (after ticket)
-    for(const f of game.fireworks){
-      for(const p of f.p){
-        ctx.fillStyle = p.col; ctx.fillRect(p.x, p.y, 2, 2);
-      }
-    }
-
-    ctx.restore();
-  }
-
-  function drawPlayer(x,y,frame,onGround){ ctx.save(); ctx.translate(x,y);
-    // shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.24)'; ctx.fillRect(4, 26, 24, 6);
-    // torso
-    ctx.fillStyle = '#6fe3ff'; ctx.fillRect(0,0,18,10);
-    // head
-    ctx.fillStyle = '#ffd7b3'; ctx.fillRect(2,-10,12,10);
-    // legs animated
-    const lf = frame%4; ctx.fillStyle = '#0b3b4a';
-    if(lf===0){ ctx.fillRect(2,10,5,12); ctx.fillRect(11,10,5,12); }
-    if(lf===1){ ctx.fillRect(2,12,5,10); ctx.fillRect(11,8,5,14); }
-    if(lf===2){ ctx.fillRect(2,10,5,12); ctx.fillRect(11,10,5,12); }
-    if(lf===3){ ctx.fillRect(2,8,5,14); ctx.fillRect(11,12,5,10); }
-    if(!onGround){ ctx.fillStyle = '#fff'; ctx.fillRect(0,-14,3,3); }
-    ctx.restore(); }
-
-  // flash overlay + temporary messages
-  let flashT = 0; let flashColor = 'rgba(255,255,255,0.06)'; let tempMsg = null; let tempMsgT = 0;
-  function flash(type){ flashT = 180; flashColor = type==='error' ? 'rgba(180,20,20,0.22)' : 'rgba(255,255,255,0.22)'; }
-  function drawFlash(){ if(flashT>0){ flashT -= 16; ctx.save(); const scaleX = (parseFloat(canvas.style.width) || 800) / W; const scaleY = (parseFloat(canvas.style.height) || 420) / H; ctx.scale(scaleX, scaleY); ctx.fillStyle = flashColor; ctx.fillRect(0,0,W,H); ctx.restore(); } }
-  function showTemporaryMessage(text, ms=1200){ tempMsg = text; tempMsgT = ms; setTimeout(()=>{ tempMsg = null; tempMsgT = 0; }, ms); }
-
-  // main loop
-  function loop(ts){ if(!game.lastTick) game.lastTick = ts; const dt = ts - game.lastTick; game.lastTick = ts; update(dt); draw(); drawFlash(); drawTempMessage(); requestAnimationFrame(loop); }
-  requestAnimationFrame(loop);
-
-  function drawTempMessage(){
-    if(!tempMsg) return;
-    const scaleX = (parseFloat(canvas.style.width) || 800) / W; const scaleY = (parseFloat(canvas.style.height) || 420) / H; ctx.save(); ctx.scale(scaleX, scaleY);
-    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(W/2 - 180, H/2 - 36, 360, 72);
-    ctx.fillStyle = '#fff'; ctx.font = '18px sans-serif'; ctx.textAlign='center'; ctx.fillText(tempMsg, W/2, H/2 + 6);
-    ctx.restore();
-  }
-
-  // control functions
-  function startGame(){ if(audioCtx.state === 'suspended') audioCtx.resume(); game.running = true; game.phase = 1; game.phaseTime = 0; startMusic(); resetPhase1(); startBtn.textContent = 'PAUSAR'; }
-  function pauseGame(){ game.running = !game.running; startBtn.textContent = game.running ? 'PAUSAR' : 'CONTINUAR'; }
-
-  function nextPhase(){
-    if(game.phase ===1){
-      game.phase = 2; resetPhase2(); game.phaseTime = 0; flash('ok');
-    } else if(game.phase ===2){
-      game.phase = 3; resetPhase3(); game.phaseTime = 0; flash('ok');
-    } else if(game.phase ===3){
-      showFinal(true);
-    }
-  }
-
-  // final
-  function showFinal(collectedTicket){
-    game.running = false; stopMusic();
-    finalEl.style.display = 'flex';
-    if(collectedTicket){
-      finalTitle.textContent = 'Convite desbloqueado!';
-      finalText.innerHTML = '💛 Com amor, Denise 💛<br>Agora que pegou a pipoca e os ingressos, vamos ao cinema?<br><br><button id="yesBtn" class="primary">Sim!</button> <button id="okBtn" class="ghost">Claro!</button>';
-      // attach same behavior to both
-      setTimeout(()=>{ const yes = document.getElementById('yesBtn'); const ok = document.getElementById('okBtn'); if(yes){ yes.addEventListener('click', ()=>{ showThankYou(); }); } if(ok){ ok.addEventListener('click', ()=>{ showThankYou(); }); } }, 80);
-    } else {
-      finalTitle.textContent = 'Missão concluída';
-      finalText.innerHTML = '💛 Com amor, Denise 💛<br>Agora que pegou a pipoca e os ingressos, vamos ao cinema?';
-    }
-  }
-  function showThankYou(){ finalText.innerHTML = '<strong>Perfeito — te espero! 🎬❤️</strong>'; sfxWin(); }
-
-  // click on ticket (canvas)
-  canvas.addEventListener('click', (e)=>{
-    if(game.phase===3 && game.ticket){
-      const r = canvas.getBoundingClientRect();
-      const logicalX = (e.clientX - r.left) * (parseFloat(canvas.style.width) / r.width);
-      const logicalY = (e.clientY - r.top) * (parseFloat(canvas.style.height) / r.height);
-      const lx = logicalX * (W / parseFloat(canvas.style.width)); const ly = logicalY * (H / parseFloat(canvas.style.height));
-      if(lx > game.ticket.x && lx < game.ticket.x + 22 && ly > game.ticket.y && ly < game.ticket.y + 12){ collectTicket(); }
-    }
+/* ====== Física e util funcs ====== */
+const gravity = 1200;
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function rectsCollide(a,b){
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+function spawnParticle(x,y,opts={}){
+  particles.push({
+    x,y,
+    vx:(Math.random()-0.5)* (opts.vxRange||200),
+    vy:(-Math.random()*200) - (opts.up||60),
+    life: opts.life||0.6,
+    size: opts.size|| (Math.random()*3 + 2),
+    color: opts.color || '#ffd166'
   });
+}
 
-  function collectTicket(){
-    if(!game.ticket) return;
-    sfxWin(); spawnParticles(game.ticket.x + 8, game.ticket.y + 6, '#fff', 40);
-    // fireworks
-    const fw = { life: 90, p: [] };
-    const cx = game.ticket.x + 11, cy = game.ticket.y + 6;
-    for(let i=0;i<60;i++){ const ang = Math.random()*Math.PI*2; const sp = rand(1,4); fw.p.push({x:cx, y:cy, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp, col: ['#ff6b91','#ffd166','#6fe3ff','#ffd8a6'][Math.floor(Math.random()*4)]}); }
-    game.fireworks.push(fw);
-    spawnHeartParticles(cx, cy, 28);
-    game.ticket = null;
-    // short delay then final
-    setTimeout(()=> showFinal(true), 900);
+/* ====== Draw helpers (pixel retro look) ====== */
+function drawRoundedRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/* ====== Fase 1 — coleta (milho, manteiga, sal) ====== */
+function resetPhase1(){
+  // limpar itens e obstáculos, manter player
+  obstacles = [];
+  items = [];
+  powerUps = [];
+  particles = [];
+  cornCount = 0;
+  popcornPacks = 0;
+  score = 0;
+  phaseTimer = MAX_PHASE_TIME;
+  // Place player at start
+  player.x = 60; player.y = groundY() - player.height; player.vx = 0; player.vy = 0;
+  player.onGround = true;
+  // spawn some initial items and obstacles spaced
+  for (let i=0;i<6;i++){
+    // spawn corn clusters
+    items.push({type:'corn', x: 220 + i*220 + Math.random()*80, y: groundY()-28, width:18, height:18, collected:false});
+  }
+  // butter and salt appear sometimes
+  items.push({type:'butter', x: 420, y: groundY()-28, width:18, height:18, collected:false});
+  items.push({type:'salt', x: 900, y: groundY()-28, width:18, height:18, collected:false});
+  // obstacles spawn logic handled in update
+}
+
+/* ====== Fase 2 — corredor de portas ====== */
+function resetPhase2(){
+  obstacles = [];
+  doors = [];
+  items = [];
+  powerUps = [];
+  particles = [];
+  phaseTimer = MAX_PHASE_TIME;
+  player.x = 60; player.y = groundY() - player.height; player.vx = 0; player.vy = 0;
+  player.onGround = true;
+  // Create corridor length and doors
+  const corridorLen = 2000 + Math.random()*1200;
+  const doorCount = 6;
+  // choose a correct door index
+  const correctIndex = Math.floor(Math.random()*doorCount);
+  for (let i=0;i<doorCount;i++){
+    const x = 300 + (i * (corridorLen / doorCount)) + (Math.random()*80 - 40);
+    doors.push({x, y: groundY()-120, width:64, height:120, index:i, correct: i===correctIndex});
+    // add some obstacles nearby
+    if (Math.random() < 0.7){
+      obstacles.push({x: x - 80 + Math.random()*120, y: groundY()-28, width:36, height:28, type:'box'});
+    }
+  }
+  // Corridor end marker
+  doors.push({x: corridorLen + 350, y: groundY()-120, width:64, height:120, index:doorCount, correct:false});
+}
+
+/* ====== Fase 3 — caça ao ingresso ====== */
+function resetPhase3(){
+  obstacles = [];
+  items = [];
+  powerUps = [];
+  particles = [];
+  phaseTimer = MAX_PHASE_TIME;
+  player.x = 60; player.y = groundY() - player.height; player.vx = 0; player.vy = 0;
+  player.onGround = true;
+  // spawn occasional obstacles
+  for (let i=0;i<6;i++){
+    obstacles.push({x:200 + i*240, y:groundY()-28, width:36, height:28, type:'rock'});
+  }
+  // create ticket that appears randomly on stage; it will move slowly and disappear periodically
+  spawnTicket();
+}
+
+function spawnTicket(){
+  // ticket appears at random spot and will live for ~10s
+  ticket = {
+    x: 300 + Math.random()*(canvas.clientWidth*1.5),
+    y: 100 + Math.random()*(groundY()-200),
+    width:40, height:28,
+    vx: (Math.random()-0.5)*40,
+    life: 10 + Math.random()*6,
+    visible: true
+  };
+}
+
+/* ====== Utilities tie to canvas size ====== */
+function groundY(){
+  return canvas.clientHeight - 60;
+}
+
+/* ====== Game loop ====== */
+function startGame(){
+  running = true;
+  phase = 1;
+  ui.startBtn.disabled = true;
+  resetPhase1();
+  lastTime = performance.now();
+  showMessage = null;
+  requestAnimationFrame(loop);
+}
+
+function restartGame(){
+  // Complete reset: do not remove player reference, but reset its state and all containers
+  player = createPlayer();
+  phase = 0;
+  running = false;
+  ui.startBtn.disabled = false;
+  obstacles = []; items = []; particles = []; doors = []; powerUps = []; ticket = null;
+  cornCount = 0; popcornPacks = 0; score = 0;
+  ui.phaseLabel.textContent = '-';
+  ui.timerLabel.textContent = '00:00';
+  ui.itemsLabel.textContent = `Milho 0 / 4`;
+  ui.scoreLabel.textContent = '0';
+  showMessage = 'Clique em INICIAR MISSÃO para jogar';
+  renderStatic(); // draw an initial screen
+}
+
+/* safe reset per-phase functions accessible externally if needed */
+function restartPhase1(){
+  // limpar todos os itens e obstáculos e resetar pontuação e posição da fase 1
+  if (phase === 1 || phase === 0){
+    resetPhase1();
+    playClick();
+  }
+}
+window.restartPhase1 = restartPhase1; // exposto só por segurança
+
+function loop(now){
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+  update(dt);
+  render();
+  if (running) requestAnimationFrame(loop);
+}
+
+/* ====== Update por frame ====== */
+function update(dt){
+  if (!running) return;
+  // update timer
+  phaseTimer -= dt;
+  if (phaseTimer < 0) phaseTimer = 0;
+  updateUI();
+
+  // Update player controls & physics
+  const moveLeft = keys['ArrowLeft'] || keys['a'];
+  const moveRight = keys['ArrowRight'] || keys['d'];
+  const speedBoost = (player.speedUntil && performance.now()/1000 < player.speedUntil);
+  const spd = player.speed * (speedBoost ? 1.6 : 1);
+
+  if (moveLeft) { player.vx = -spd; player.facing = -1; player.animFrame += dt*12; }
+  else if (moveRight) { player.vx = spd; player.facing = 1; player.animFrame += dt*12; }
+  else { player.vx = 0; player.animFrame = 0; }
+
+  // apply gravity
+  player.vy += gravity * dt;
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+
+  // ground collision
+  const gY = groundY();
+  if (player.y + player.height > gY){
+    player.y = gY - player.height;
+    player.vy = 0;
+    player.onGround = true;
+  } else player.onGround = false;
+
+  // Keep player within left boundary
+  if (player.x < 10) player.x = 10;
+  // For stage types, world x offset and camera behavior
+  if (phase === 1){
+    // spawn obstacles occasionally to make gameplay lively but easy
+    if (Math.random() < 0.02) obstacles.push({x: canvas.clientWidth + Math.random()*240, y: groundY()-28, width:36, height:28, type:'rock'});
+    // move obstacles left to simulate forward movement
+    for (const ob of obstacles) ob.x -= (100 + Math.random()*80) * dt;
+    // move items left slowly
+    for (const it of items) it.x -= 100 * dt;
+
+    // collision with obstacles
+    for (let i = obstacles.length-1; i>=0; i--){
+      const ob = obstacles[i];
+      if (rectsCollide(player, ob)){
+        if (player.shieldUntil && performance.now()/1000 < player.shieldUntil){
+          // pass through
+          playBeep({freq:400,time:0.06,gain:0.06,type:'sine'});
+          // show small particle
+          for (let p=0;p<6;p++) spawnParticle(player.x + player.width/2, player.y + 10, {color:'#f6c6ea'});
+        } else {
+          // penalty: small score decrease and reposition sooner
+          playBeep({freq:220,time:0.08,gain:0.08,type:'square'});
+          score = Math.max(0, score - 3);
+          player.x = Math.max(60, player.x - 80);
+          // brief stun - move slowly for a moment
+          player.speedUntil = performance.now()/1000 + 0.8;
+        }
+      }
+    }
+
+    // collision with items
+    for (let i=items.length-1;i>=0;i--){
+      const it = items[i];
+      if (!it.collected && rectsCollide(player, it)){
+        it.collected = true;
+        playCollect();
+        // item effects
+        if (it.type === 'corn'){
+          cornCount += 1;
+          spawnParticle(it.x + it.width/2, it.y, {color:'#fff2b8', up:120, size:4, life:0.9});
+          // hearts when something is collected
+          for (let p=0;p<10;p++) spawnParticle(it.x + it.width/2, it.y, {color:'#f6c6ea', size:2, up:40});
+        } else if (it.type === 'butter'){
+          score += 8;
+          // grant temporary speed
+          player.speedUntil = performance.now()/1000 + 4;
+        } else if (it.type === 'salt'){
+          score += 5;
+          // grant shield briefly
+          player.shieldUntil = performance.now()/1000 + 3;
+        }
+        // remove after some time visually; keep recorded
+        items.splice(i,1);
+      }
+    }
+
+    // convert 2 milhos => 1 pack
+    const packsBefore = popcornPacks;
+    popcornPacks = Math.floor(cornCount / 2);
+    if (popcornPacks > packsBefore){
+      // animate package acquired
+      playWin();
+      score += 20;
+      // heart particles
+      for (let p=0;p<20;p++) spawnParticle(player.x + player.width/2, player.y - 10, {color:'#f6c6ea', up:180, size:3});
+    }
+
+    // Check win condition for phase1: 2 packs (4 milhos)
+    if (popcornPacks >= 2){
+      // flash, short delay, then transition
+      phase = 2;
+      playWin();
+      // small transition effect: keep player pos but reset stage2
+      resetPhase2();
+    }
+
+    // Remove old obstacles/items off-screen (left)
+    obstacles = obstacles.filter(o => o.x + (o.width||40) > -50);
+    items = items.filter(it => it.x + it.width > -50);
+
+    // If time runs out, make it easier: spawn many corn near player
+    if (phaseTimer < 10 && items.length < 3){
+      items.push({type:'corn', x: player.x + 140 + Math.random()*120, y: groundY()-28, width:18, height:18});
+    }
+
+  } else if (phase === 2){
+    // corridor: We simulate camera by having doors/obstacles move left while player tends to be at x~80
+    for (const d of doors) d.x -= (player.vx* dt); // small parallax
+    for (const ob of obstacles) ob.x -= 100 * dt;
+
+    // allow horizontal movement (left/right) along corridor but if player overlaps door area, check
+    // In this simple model: camera scrolls forward slowly to create urgency
+    for (const d of doors){
+      if (rectsCollide(player, {x:d.x - camOffset, y:d.y, width:d.width, height:d.height})){
+        // BUT we use a camera offset in render, so detect after adjusting below
+      }
+    }
+
+    // Simpler: choose world offset so corridor scroll responds to player's x
+    // We'll manage collisions in render where we compute cameraOffset
+
+    // Collisions with obstacles handled similarly to phase1:
+    for (let i=obstacles.length-1;i>=0;i--){
+      const ob = obstacles[i];
+      ob.x -= 150*dt;
+      if (rectsCollide(player, ob)){
+        playBeep({freq:240,time:0.06,gain:0.07});
+        // send player to beginning of phase (restart)
+        resetPhase2();
+        playClick();
+        // small penalty
+      }
+    }
+
+    // If time low, make finish easier: set one door glowing correct near front
+    if (phaseTimer < 8){
+      // find entrance near start and mark correct
+      const nearDoor = doors[Math.floor(Math.random()*Math.min(doors.length,3))];
+      if (nearDoor) nearDoor.correct = true;
+    }
+
+    // A door collision is handled on click/touch (player must move into door and press up).
+    // We'll detect door overlap in input handlers and on collision in render.
+    // (No further updates here.)
+  } else if (phase === 3){
+    // phase 3: ticket moves slowly, obstacles move
+    for (const ob of obstacles) ob.x -= 120 * dt;
+    if (ticket){
+      ticket.x += ticket.vx * dt;
+      ticket.life -= dt;
+      if (ticket.life <= 0) {
+        // hide then respawn later
+        ticket = null;
+        setTimeout(spawnTicket, 1200 + Math.random()*1500);
+      }
+      // collision with player
+      if (rectsCollide(player, ticket)){
+        // success: collected automatically if player touches OR allow clicking ticket
+        collectTicket();
+      }
+    }
+    // obstacles collisions (penalty but not deadly)
+    for (let i=0;i<obstacles.length;i++){
+      if (rectsCollide(player, obstacles[i])){
+        playBeep({freq:260,time:0.05,gain:0.06});
+        score = Math.max(0, score - 2);
+        player.x = Math.max(60, player.x - 70);
+      }
+    }
   }
 
-  // helper sfxTone accessible (exposed earlier duplicate guard)
-  function sfxTone(freq,dur,type,gain){ if(muted) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.type = type; o.frequency.value = freq; g.gain.value = gain; o.connect(g); g.connect(masterGain); o.start(); g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur); o.stop(audioCtx.currentTime + dur + 0.02); }
+  // Update particles
+  for (let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.vy += 600 * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt;
+    if (p.life <= 0) particles.splice(i,1);
+  }
 
-  // initial state
-  resetAll(); phaseLabel.textContent = '—'; timeLabel.textContent = '2:00';
+  // If phase timer reaches 0 and still playing, gently guide to success by reducing obstacle frequency
+  if (phaseTimer <= 0){
+    if (phase === 1){
+      // spawn easy corns near player
+      if (items.length < 4) items.push({type:'corn', x:player.x + 120 + Math.random()*80, y:groundY()-28, width:18, height:18});
+    } else if (phase === 2){
+      // mark nearest door as correct
+      if (doors.length) doors[0].correct = true;
+    } else if (phase === 3){
+      // spawn ticket near player
+      if (!ticket) ticket = {x:player.x + 120, y:player.y - 30, width:40, height:28, vx:0, life:8, visible:true};
+    }
+  }
+}
 
-})();
+/* ====== Input handling ====== */
+window.addEventListener('keydown', e => {
+  if (['ArrowLeft','ArrowRight','ArrowUp','a','d','w',' '].includes(e.key)){
+    keys[e.key] = true;
+    e.preventDefault();
+  }
+  // jump
+  if (e.key === 'ArrowUp' || e.key === 'w' || e.key === ' '){
+    if (player.onGround){
+      player.vy = -player.jumpPower;
+      player.onGround = false;
+      playJump();
+    }
+  }
+});
+
+window.addEventListener('keyup', e => {
+  keys[e.key] = false;
+});
+
+canvas.addEventListener('touchstart', (ev)=>{
+  const t = ev.touches[0];
+  touchState.startX = t.clientX;
+  touchState.startY = t.clientY;
+  touchState.swiping = true;
+  // short tap = jump
+  const now = performance.now();
+  if (player.onGround){
+    player.vy = -player.jumpPower;
+    player.onGround = false;
+    playJump();
+  }
+  ev.preventDefault();
+});
+
+canvas.addEventListener('touchmove', (ev)=>{
+  if (!touchState.swiping) return;
+  const t = ev.touches[0];
+  touchState.endX = t.clientX;
+  touchState.endY = t.clientY;
+  const dx = touchState.endX - touchState.startX;
+  if (Math.abs(dx) > 10){
+    // realistic movement by dragging horizontally
+    if (dx > 0) keys['ArrowRight'] = true, keys['ArrowLeft'] = false;
+    else keys['ArrowLeft'] = true, keys['ArrowRight'] = false;
+  }
+});
+
+canvas.addEventListener('touchend', (ev)=>{
+  touchState.swiping = false;
+  keys['ArrowLeft'] = keys['ArrowRight'] = false;
+  // treat as click for some interactions
+  const rect = canvas.getBoundingClientRect();
+  const x = (touchState.endX || touchState.startX) - rect.left;
+  const y = (touchState.endY || touchState.startY) - rect.top;
+  handleCanvasClick(x, y);
+});
+
+/* mouse click for desktop interactions */
+canvas.addEventListener('click', (ev)=>{
+  const rect = canvas.getBoundingClientRect();
+  const x = ev.clientX - rect.left;
+  const y = ev.clientY - rect.top;
+  handleCanvasClick(x,y);
+});
+
+/* handle click/tap interactions e.g., entering doors or clicking tickets */
+function handleCanvasClick(canvasX, canvasY){
+  if (!running) return;
+  // compute camera offset if phase 2
+  if (phase === 2){
+    // camera offset logic: keep player around one-quarter of width
+    const camOffset = Math.max(0, player.x - 120);
+    // find doors colliding with click
+    for (const d of doors){
+      const sx = d.x - camOffset;
+      const sy = d.y;
+      if (canvasX >= sx && canvasX <= sx + d.width && canvasY >= sy && canvasY <= sy + d.height){
+        // clicked a door
+        if (d.correct){
+          playWin();
+          // transit to phase 3
+          phase = 3;
+          resetPhase3();
+        } else {
+          // wrong door: restart phase2
+          playBeep({freq:220,time:0.06,gain:0.08});
+          resetPhase2();
+        }
+        return;
+      }
+    }
+  } else if (phase === 3){
+    // clicking ticket success
+    if (ticket){
+      // compute ticket on-screen pos (no camera)
+      const sx = ticket.x;
+      const sy = ticket.y;
+      if (canvasX >= sx && canvasX <= sx + ticket.width && canvasY >= sy && canvasY <= sy + ticket.height){
+        collectTicket();
+      }
+    }
+  }
+}
+
+function collectTicket(){
+  if (!ticket) return;
+  playWin();
+  // particles + hearts
+  for (let p=0;p<40;p++) spawnParticle(ticket.x + ticket.width/2, ticket.y + ticket.height/2, {color:'#f6c6ea', up:200, size:3});
+  // show final after small delay
+  setTimeout(()=>{ phase = 4; running = false; showFinal(); }, 800);
+}
+
+/* ====== Render ====== */
+function render(){
+  // clear
+  ctx.fillStyle = '#081123'; ctx.fillRect(0,0,canvas.clientWidth,canvas.clientHeight);
+
+  // draw background grid / parallax stars for depth
+  drawBackground();
+
+  // ground
+  ctx.fillStyle = '#102233';
+  drawRoundedRect(0, groundY(), canvas.clientWidth, canvas.clientHeight - groundY(), 0);
+
+  // draw based on phase
+  if (phase === 1){
+    renderPhase1();
+  } else if (phase === 2){
+    renderPhase2();
+  } else if (phase === 3){
+    renderPhase3();
+  } else {
+    renderMenu();
+  }
+
+  // draw particles on top
+  for (const p of particles){
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // HUD static elements are underneath HTML elements; update labels
+  updateUI();
+}
+
+function renderStatic(){
+  ctx.fillStyle = '#081123'; ctx.fillRect(0,0,canvas.clientWidth,canvas.clientHeight);
+  ctx.fillStyle = '#fff'; ctx.font = '18px Inter, sans-serif'; ctx.textAlign='center';
+  ctx.fillText(showMessage || 'Clique em INICIAR MISSÃO', canvas.clientWidth/2, canvas.clientHeight/2);
+}
+
+function drawBackground(){
+  // subtle stars
+  ctx.fillStyle = '#061427';
+  for (let i=0;i<20;i++){
+    ctx.fillRect((i*67)%canvas.clientWidth, (i*29)%Math.max(1,canvas.clientHeight-40), 1,1);
+  }
+}
+
+/* phase1 render */
+function renderPhase1(){
+  // draw items and obstacles relative to canvas (we move them)
+  // draw items
+  for (const it of items){
+    if (it.type === 'corn'){
+      ctx.fillStyle = '#ffd166';
+      ctx.fillRect(it.x, it.y, it.width, it.height);
+      ctx.fillStyle = '#7a3b00';
+      ctx.fillRect(it.x+2, it.y+2, 3,3);
+    } else if (it.type === 'butter'){
+      ctx.fillStyle = '#fff0a3';
+      ctx.fillRect(it.x, it.y, it.width, it.height);
+    } else if (it.type === 'salt'){
+      ctx.fillStyle = '#dbe7ff';
+      ctx.fillRect(it.x, it.y, it.width, it.height);
+    }
+  }
+  // draw obstacles
+  for (const ob of obstacles){
+    ctx.fillStyle = '#6b7280';
+    ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
+  }
+  // draw player
+  drawPlayer();
+}
+
+/* phase2 render */
+function renderPhase2(){
+  // camera offset: keep player around 120px from left
+  const camOffset = Math.max(0, player.x - 120);
+  // floor pattern for corridor
+  ctx.fillStyle = '#081827';
+  ctx.fillRect(0, groundY()-80, canvas.clientWidth, 80);
+
+  // doors
+  for (const d of doors){
+    const sx = d.x - camOffset;
+    const sy = d.y;
+    // only draw if on-screen
+    if (sx < -200 || sx > canvas.clientWidth + 200) continue;
+    // door frame
+    ctx.fillStyle = d.correct ? '#ffd166' : '#8fa3b8';
+    drawRoundedRect(sx, sy, d.width, d.height, 6);
+    // small glow for correct doors when close to completion
+    if (d.correct) {
+      ctx.globalAlpha = 0.15;
+      ctx.fillStyle = '#ffd166';
+      drawRoundedRect(sx-8, sy-8, d.width+16, d.height+16, 10);
+      ctx.globalAlpha = 1;
+    }
+    // door knob
+    ctx.fillStyle = '#6b3b00';
+    ctx.beginPath(); ctx.arc(sx + d.width - 12, sy + d.height/2, 4,0,Math.PI*2); ctx.fill();
+  }
+
+  // obstacles around corridor (parallax)
+  for (const ob of obstacles){
+    const sx = ob.x - camOffset;
+    if (sx < -200 || sx > canvas.clientWidth + 200) continue;
+    ctx.fillStyle = '#7c8795';
+    ctx.fillRect(sx, ob.y, ob.width, ob.height);
+  }
+
+  // draw player (fixed relative to screen)
+  drawPlayer();
+}
+
+/* phase3 render */
+function renderPhase3(){
+  // draw items/obstacles
+  for (const ob of obstacles){
+    ctx.fillStyle = '#7c8795';
+    ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
+  }
+  // draw ticket
+  if (ticket){
+    ctx.fillStyle = '#ffd166';
+    ctx.fillRect(ticket.x, ticket.y, ticket.width, ticket.height);
+    // small star
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(ticket.x + 6, ticket.y + 6, 4, 4);
+  }
+  drawPlayer();
+}
+
+/* draw player as pixel-ish sprite */
+function drawPlayer(){
+  // player is drawn in world coordinates for phase2 (with camera)
+  let drawX = player.x;
+  let drawY = player.y;
+  if (phase === 2){
+    const camOffset = Math.max(0, player.x - 120);
+    drawX = player.x - camOffset;
+  }
+  // body
+  ctx.fillStyle = '#1f6feb';
+  ctx.fillRect(drawX, drawY, player.width, player.height);
+  // head
+  ctx.fillStyle = '#ffe0bd';
+  ctx.fillRect(drawX+6, drawY-12, 24, 16);
+  // eye
+  ctx.fillStyle = '#000';
+  ctx.fillRect(drawX+18 + (player.facing>0?2:-2), drawY-6, 3,3);
+  // legs simple
+  ctx.fillStyle = '#0b2238';
+  ctx.fillRect(drawX+6, drawY+player.height-6, 8,6);
+  ctx.fillRect(drawX+22, drawY+player.height-6, 8,6);
+  // shield visual
+  if (player.shieldUntil && performance.now()/1000 < player.shieldUntil){
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = '#a5f3fc';
+    ctx.beginPath();
+    ctx.ellipse(drawX + player.width/2, drawY + player.height/2, player.width, player.height, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* render menu or final screens */
+function renderMenu(){
+  // show message in center
+  ctx.fillStyle = '#e6eef8';
+  ctx.font = '20px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(showMessage || 'Clique em INICIAR MISSÃO', canvas.clientWidth/2, canvas.clientHeight/2);
+}
+
+/* show final unlock (reveal invitation) */
+function showFinal(){
+  // draw a celebratory modal on top of canvas
+  ctx.fillStyle = '#071726';
+  ctx.fillRect(0,0,canvas.clientWidth,canvas.clientHeight);
+  // fireworks hearts already spawned earlier
+  ctx.fillStyle = '#fff';
+  ctx.font = '28px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Surpresa desbloqueada!', canvas.clientWidth/2, canvas.clientHeight/2 - 40);
+  ctx.font = '20px Inter, sans-serif';
+  ctx.fillText('Com amor, Denise 💛', canvas.clientWidth/2, canvas.clientHeight/2 + 0);
+  ctx.font = '14px Inter, sans-serif';
+  ctx.fillText('Clique REINICIAR para jogar novamente', canvas.clientWidth/2, canvas.clientHeight/2 + 40);
+  // animate some extra particles
+  for (let i=0;i<60;i++) spawnParticle(canvas.clientWidth/2 + (Math.random()-0.5)*200, canvas.clientHeight/2 + (Math.random()-0.5)*100, {color:'#f6c6ea', up:200, size:3});
+}
+
+/* ====== UI updates ====== */
+function formatTime(s){
+  s = Math.max(0, Math.floor(s));
+  const mm = Math.floor(s/60); const ss = s%60;
+  return `${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+}
+function updateUI(){
+  ui.phaseLabel.textContent = phase || '-';
+  ui.timerLabel.textContent = formatTime(phaseTimer);
+  ui.itemsLabel.textContent = `Milho ${cornCount} / 4`;
+  ui.scoreLabel.textContent = String(score);
+}
+
+/* ====== Initialization ====== */
+restartGame(); // show menu
+
+// Ensure the canvas is interactive on mobile (avoid passive listeners)
+['touchstart','touchmove','touchend'].forEach(ev => {
+  canvas.addEventListener(ev, e => {}, {passive:false});
+});
+
+/* small helper to start automatically if desired in future */
+// document.getElementById('startBtn').click();
+
 </script>
 </body>
 </html>
+
 
